@@ -11,7 +11,7 @@ import { AlertToasts } from "./AlertToasts";
 import { UpdateBar } from "./UpdateBar";
 import { useCanWrite } from "./viewer";
 import { WindowDialog } from "./WindowDialog";
-import { CardRegion } from "./CardRegion";
+import { AskAgentBar, CardRegion } from "./CardRegion";
 import { Home } from "./Home";
 import { TopBar, type HeaderOpen } from "./TopBar";
 
@@ -136,9 +136,10 @@ export function Cockpit() {
       ) : null}
       <main className="cf-layout" id="main" tabIndex={-1}>
         <h1 className="sr-only">Family Office lane cockpit</h1>
+        {glance ? <AskAgentBar /> : null}
         {h ? <Home home={h} glance={glance} canWrite={canWrite} notify={notify} onOpen={open} onDone={refresh} /> : <div className="cf-home cf-loading">Reading the cockpit…</div>}
         <nav className="cf-launch" aria-label="Sections">
-          <CardRegion focus={glance ? GLANCE_CARDS : undefined} />
+          <CardRegion focus={glance ? GLANCE_CARDS : undefined} noAsk={glance} />
         </nav>
       </main>
       {h && !glance ? <div className="cf-foot">{h.foot}</div> : null}

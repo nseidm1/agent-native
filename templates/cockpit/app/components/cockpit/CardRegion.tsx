@@ -421,8 +421,25 @@ function CockpitSync() {
   return null;
 }
 
-/** focus: show only these cards (the cockpit's phone glance), in the layout's bands and order. */
-export function CardRegion({ focus }: { focus?: readonly CardId[] } = {}) {
+/** The Ask agent button and its panel on their own: the cockpit's phone glance puts them at the very top of the page, above the Lane card. */
+export function AskAgentBar() {
+  const [askOpen, setAskOpen] = useState(false);
+  return (
+    <div className="cp-region cp-askbar" role="region" aria-label="Ask agent" data-testid="cp-askbar">
+      <button type="button" className="cp-btn" aria-expanded={askOpen} aria-controls="cp-ask" onClick={() => setAskOpen((v) => !v)}>
+        ✦ Ask agent
+      </button>
+      {askOpen ? (
+        <div id="cp-ask">
+          <AskPanel onClose={() => setAskOpen(false)} />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+/** focus: show only these cards (the cockpit's phone glance), in the layout's bands and order; noAsk: the page shows the Ask agent elsewhere. */
+export function CardRegion({ focus, noAsk }: { focus?: readonly CardId[]; noAsk?: boolean } = {}) {
   const cardsQ = useActionQuery<CardsResult>("get-cards", {}, { refetchInterval: 15000 });
   const layoutQ = useActionQuery<CockpitLayout>("get-layout", {}, { refetchInterval: 30000 });
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -498,20 +515,22 @@ export function CardRegion({ focus }: { focus?: readonly CardId[] } = {}) {
           {status.text}
         </span>
         <span className="cp-spacer" />
-        <button
-          type="button"
-          className="cp-btn"
-          aria-expanded={askOpen}
-          aria-controls="cp-ask"
-          onClick={() => setAskOpen((v) => !v)}
-        >
-          ✦ Ask agent
-        </button>
+        {noAsk ? null : (
+          <button
+            type="button"
+            className="cp-btn"
+            aria-expanded={askOpen}
+            aria-controls="cp-ask"
+            onClick={() => setAskOpen((v) => !v)}
+          >
+            ✦ Ask agent
+          </button>
+        )}
       </header>
 
       <AppliedBanner />
 
-      {askOpen ? (
+      {askOpen && !noAsk ? (
         <div id="cp-ask">
           <AskPanel onClose={() => setAskOpen(false)} />
         </div>

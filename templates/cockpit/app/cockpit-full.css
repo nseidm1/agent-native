@@ -1447,6 +1447,17 @@
   .cf-home.glance .cf-kt:not([data-tile="kVel"]) .cf-lab {
     letter-spacing: 0.06em;
   }
+  /* the glance's Ask agent, at the very top above the Lane card: a full-width neon button, its panel opening under it */
+  .cf-layout > .cp-askbar {
+    padding: 0;
+    gap: 8px;
+  }
+  .cp-askbar > .cp-btn {
+    width: 100%;
+    height: 40px;
+    justify-content: center;
+    font-size: 12px;
+  }
 }
 
 /* FA-19135: the forge alert toasts (the legacy snackbar) and the "cockpit updated" bar */
