@@ -43,7 +43,7 @@ export const isWindowId = (s: unknown): s is WindowId => typeof s === "string" &
  * (LegacyWindow) until its section lands. server/cockpit/windows/registry.spec.ts keeps this equal to the
  * registry's builders, so a window is native exactly when it has one.
  */
-export const NATIVE_WINDOWS: readonly WindowId[] = ["push", "apps"];
+export const NATIVE_WINDOWS: readonly WindowId[] = ["push", "apps", "questions", "issues"];
 export const isNativeWindow = (s: unknown): s is WindowId => isWindowId(s) && NATIVE_WINDOWS.includes(s);
 
 /** The header buttons (their legacy ids, TopBar's HeaderOpen) and the window each opens. */

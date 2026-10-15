@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import type { BudgetView, FaceView, HomeView, KeyTile, LaneView, ModeView, Opens } from "@shared/cockpit-home";
 import { KeyChart } from "./KeyChart";
 import { OfficeCard } from "./OfficeCard";
+import { QuestionsButton } from "./windows/QuestionsButton";
 
 export type Notify = (text: string, bad?: boolean) => void;
 export type OpenFn = (o: Opens, el: HTMLElement) => void;
@@ -349,6 +350,7 @@ export function Home({ home, canWrite, notify, onOpen, onDone }: { home: HomeVie
       <div className="cf-lanerow">
         <div className="cf-lanecol">
           <LaneControl lane={home.lane} canWrite={canWrite} notify={notify} onDone={onDone} />
+          <QuestionsButton q={home.lane.questions} onOpen={(el) => onOpen({ legacy: "questions" }, el)} />
           <BudgetBox budget={home.budget} canWrite={canWrite} notify={notify} onDone={onDone} />
         </div>
         <OfficeCard office={home.office} onOpen={(slug, el) => onOpen({ legacy: slug }, el)} />

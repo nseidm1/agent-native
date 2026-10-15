@@ -153,8 +153,18 @@ export function headerOf(d: Record<string, J>, at: number): HeaderView {
 // ---------- the lane switches (locksTick) and the Budget (bPaint) ----------
 export function laneOf(d: Record<string, J>): LaneView {
   const L = d.status && d.status.locks;
-  if (!L || typeof L !== "object") return { unlocked: null, production: null, client: null };
-  return { unlocked: L.masterIntervene === true, production: L.dispatcher !== false, client: L.haloClient !== false };
+  const q = questionsBtnOf(d.features && d.features.questions);
+  const questions = q ? { questions: q } : {};
+  if (!L || typeof L !== "object") return { unlocked: null, production: null, client: null, ...questions };
+  return { unlocked: L.masterIntervene === true, production: L.dispatcher !== false, client: L.haloClient !== false, ...questions };
+}
+/** FA-19134: the legacy qTick - the Lane card's questions button from features.questions; null (hidden) when none is open. */
+export function questionsBtnOf(q: J): LaneView["questions"] {
+  const n = q && q.published ? Number(q.n) || 0 : 0;
+  if (!n) return null;
+  const label = String(q.label || n + (n === 1 ? " question for you" : " questions for you"));
+  const sub = [q.blocking ? q.blocking + " blocking a launch" : q.money ? q.money + " about money" : "keep the work moving", "about " + (q.minutes || Math.max(1, Math.round((n * 40) / 60))) + " min"].join(" · ");
+  return { n, label, sub, tone: q.tone === "red" ? "red" : "amber", aria: label + (q.blocking ? ", " + q.blocking + " blocking" : "") + ". Open the questions" };
 }
 export function budgetOf(d: Record<string, J>): BudgetView | null {
   const b = d.budget;
