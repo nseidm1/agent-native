@@ -177,7 +177,7 @@ export function AppliedBanner() {
   return (
     <div className="cp-applied" role="status" data-testid="applied-banner" data-job={job.id} data-kind={job.kind}>
       <span className="cp-ask-path k-apply">{job.kind === "undo" ? (job.status === "live" ? "Undone" : "Undo failed") : "Applied"}</span>
-      <span className="cp-applied-t">
+      <span className="cp-applied-t" title={job.kind === "undo" ? job.title : job.summary || job.title}>
         {job.kind === "undo" ? job.title : job.summary || job.title}
         {job.commit ? <code title={job.commit}> {job.commit.slice(0, 10)}</code> : null}
       </span>

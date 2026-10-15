@@ -1884,6 +1884,11 @@ select.cp-in {
   flex: 1 1 200px;
   min-width: 0;
   overflow-wrap: anywhere;
+  /* the agent's own words can run long: three lines here, the whole text in the tooltip */
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 .cp-applied .cp-x {
   padding: 0 8px;
