@@ -34,7 +34,9 @@ export async function runWindows({ browser, windows, base, legacyUrl, outDir, ch
     if (proxyRoutes) await proxyRoutes(ctx);
     const lp = await ctx.newPage(), np = await ctx.newPage();
     const errs = [];
-    np.on("console", (m) => m.type() === "error" && errs.push(m.text()));
+    // FA-19174: the live staging app's own console (its frame's framebust, its event feed) is the app's, not the cockpit's
+    const appFrame = (m) => /\/frame\/(?:s|p|v-[0-9a-f]+)\//.test((m.location() && m.location().url) || "");
+    np.on("console", (m) => m.type() === "error" && !appFrame(m) && errs.push(m.text()));
     np.on("pageerror", (e) => errs.push(String(e)));
     np.on("response", (r) => r.status() >= 400 && r.frame() === np.mainFrame() && errs.push(r.status() + " " + r.url()));
     lp.on("dialog", (d) => d.dismiss().catch(() => {}));
