@@ -65,8 +65,16 @@ export default {
       return { status: res.status, body: (await res.text()).slice(0, 200) };
     });
     check("Studio: Start staging round-trips to the cockpit's refusal for an app that does not exist (nothing starts)", r.status >= 400 && r.status < 500 && /no such app|not|app/i.test(r.body), JSON.stringify(r));
-    // 3. #apps=<id> opens the studio natively, straight from the address (the legacy page's link form), with no legacy frame
-    await np.keyboard.press("Escape").catch(() => {});
+    // 3. the deeper studio tools not rendered here yet (FA-19172..FA-19175) open the legacy studio at #apps=<id> (its load blocked here)
+    await np.route("**/legacy/**", (rt) => rt.abort());
+    await st.getByRole("button", { name: "Agent, menus, live frame" }).click();
+    const frame = np.locator("[data-testid=cf-legacy] iframe");
+    await frame.waitFor({ timeout: 5000 }).catch(() => {});
+    const src = (await frame.count()) ? await frame.getAttribute("src") : "";
+    check("Studio: Agent, menus, live frame opens the legacy studio tools at #apps=<id> until FA-19172..FA-19175 land", src.endsWith("#apps=" + APP), src);
+    await np.locator("[data-testid=cf-legacy] .cf-legacy-bar button").click().catch(() => {});
+    await np.unroute("**/legacy/**");
+    // 4. #apps=<id> opens the studio natively, straight from the address (the legacy page's link form), with no legacy frame
     await np.waitForTimeout(400);
     await np.evaluate((app) => {
       location.hash = "#apps=" + app;

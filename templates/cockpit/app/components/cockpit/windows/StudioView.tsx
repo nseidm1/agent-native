@@ -41,7 +41,9 @@ const STATUS_WORD: Record<string, string> = { verified: "verified", failing: "fa
  * FA-19157: an app's studio, rendered by agent-native from the cockpit client (the Apps window with args.app). The legacy
  * studio's face: the identity line (staging and production, each with its age), the inbox badge, the lifecycle bar (Build,
  * Quality, Launch ready, Deploy, Live; the tile that needs the console is marked, and each opens its detail), the staging
- * app's picture with Open staging and Start, the newest staging changes and the studio's activity.
+ * app's picture with Open staging and Start, the newest staging changes and the studio's activity. The studio's deeper tools (the Agent
+ * chat, the action menus, the live staging frame: FA-19172 to FA-19175) still open in the legacy studio from "Agent, menus, live frame",
+ * so moving Open studio here took no capability away; that button goes when they land (FA-19136).
  */
 export function StudioView({ s, canWrite, onDone, onBack }: { s: StudioData; canWrite: boolean; onDone: () => void; onBack: () => void }) {
   const [open, setOpen] = useState<string | null>(null);
@@ -93,6 +95,14 @@ export function StudioView({ s, canWrite, onDone, onBack }: { s: StudioData; can
           <span aria-hidden="true">✉</span> {s.inbox.text}
           {!s.inbox.need && s.inbox.proposals ? <span className="ap-chip">{s.inbox.proposals} proposals</span> : null}
         </span>
+        <button
+          type="button"
+          className="cp-btn sm ghost"
+          title="The Agent chat, the Build / Design / Improve / Verify / Launch menus and the live staging frame are not rendered here yet (FA-19172 to FA-19175): they open in the legacy studio"
+          onClick={() => window.dispatchEvent(new CustomEvent("cockpit-open-legacy", { detail: { slug: "apps=" + s.app, label: s.name + " studio tools" } }))}
+        >
+          Agent, menus, live frame
+        </button>
         {s.staging.url ? (
           <a className="cp-btn sm" href={s.staging.url} target="_blank" rel="noopener noreferrer">
             Open staging ↗
