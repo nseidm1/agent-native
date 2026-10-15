@@ -4,6 +4,7 @@ import type { WindowDetail, WindowId } from "@shared/cockpit-windows";
 
 import { AccountPart } from "./AccountPart";
 import { MasterPart } from "./MasterPart";
+import { PhonePart } from "./PhonePart";
 
 /** What a window's own part gets: its document, whether this viewer may write, and a refresh. */
 export type WindowPartProps = { d: WindowDetail; canWrite: boolean; onDone: () => void };
@@ -15,4 +16,5 @@ export type WindowPartProps = { d: WindowDetail; canWrite: boolean; onDone: () =
 export const WINDOW_PARTS: Partial<Record<WindowId, ComponentType<WindowPartProps>>> = {
   account: AccountPart,
   master: MasterPart,
+  phone: PhonePart,
 };

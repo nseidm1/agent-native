@@ -1,0 +1,110 @@
+/* FA-19128: the Phone app window's pick, steps and Install (PhonePart), in the neon theme. */
+.cf-ph {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cf-ph-devs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.cf-ph-devs label {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--inner);
+  font-size: 13px;
+  color: var(--tx2);
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.cf-ph-devs label.on {
+  border-color: var(--sky);
+  color: var(--tx);
+  box-shadow: 0 0 10px rgba(76, 195, 255, 0.18);
+}
+.cf-ph-devs input {
+  accent-color: var(--sky);
+}
+.cf-ph-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.cf-ph-steps li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--mute);
+  min-width: 0;
+}
+.cf-ph-sn {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.cf-ph-sl {
+  font-size: 11.5px;
+  color: var(--tx2);
+  overflow-wrap: anywhere;
+}
+.cf-ph-steps li.on {
+  border-color: var(--amb);
+  color: var(--amb);
+  box-shadow: 0 0 10px rgba(251, 191, 36, 0.18);
+}
+.cf-ph-steps li.did {
+  border-color: rgba(52, 211, 153, 0.45);
+  color: var(--em);
+}
+.cf-ph-steps li.bad {
+  border-color: rgba(248, 113, 113, 0.55);
+  color: var(--red);
+}
+.cf-ph-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+}
+.cf-ph-stat {
+  flex: 1 1 200px;
+  font-size: 12px;
+  color: var(--tx2);
+  overflow-wrap: anywhere;
+}
+.cf-ph-stat.bad {
+  color: var(--red);
+}
+.cp-btn.cf-ph-go {
+  border-color: var(--sky);
+  color: #fff;
+  background: linear-gradient(180deg, rgba(76, 195, 255, 0.32), rgba(76, 195, 255, 0.1));
+}
+@media (max-width: 640px) {
+  .cf-ph-steps {
+    grid-template-columns: 1fr;
+  }
+  .cf-ph .cp-btn {
+    min-height: 44px;
+  }
+}
+/* the pick and Install sit after the readings, as in the legacy dialog (what, devices, last, then the button) */
+.cf-ph {
+  order: 1;
+}
+.cf-win[data-window="phone"] .cp-dlg-b > .cp-at {
+  order: 2;
+}
