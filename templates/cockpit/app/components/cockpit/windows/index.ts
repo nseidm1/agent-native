@@ -3,6 +3,8 @@ import type { ComponentType } from "react";
 import type { WindowDetail, WindowId } from "@shared/cockpit-windows";
 
 import { OverviewPart } from "./OverviewPart";
+// FA-19131: the commit queue has no Part; its text section reads as the legacy pre through this stylesheet
+import "./queue.css";
 
 /** What a window's own part gets: its document, whether this viewer may write, and a refresh. */
 export type WindowPartProps = { d: WindowDetail; canWrite: boolean; onDone: () => void };

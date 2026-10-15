@@ -1,0 +1,25 @@
+/* FA-19131: the commit queue's text (the legacy qvPre): pre-formatted columns in the mono face; a wide line scrolls inside
+   its own block, never the page. */
+.cf-win[data-window="queue"] .cp-text {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid rgba(76, 195, 255, 0.18);
+  border-radius: 6px;
+  background: var(--deep);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--tx);
+  white-space: pre;
+  overflow-wrap: normal;
+  overflow-x: auto;
+  max-width: 100%;
+  tab-size: 8;
+  scrollbar-color: rgba(76, 195, 255, 0.35) transparent;
+}
+@media (max-width: 640px) {
+  .cf-win[data-window="queue"] .cp-text {
+    padding: 8px 9px;
+    font-size: 11px;
+  }
+}
