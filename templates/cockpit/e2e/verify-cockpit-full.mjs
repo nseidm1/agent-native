@@ -21,6 +21,7 @@ import path from "node:path";
 
 import { chromium } from "@playwright/test";
 
+import { alertsPass } from "./alerts-pass.mjs";
 import { runWindows } from "./windows/harness.mjs";
 import { WINDOWS } from "./windows/index.mjs";
 
@@ -93,6 +94,7 @@ try {
   if (!windowsOnly) await homePass();
   const wins = onlyWindows ? WINDOWS.filter((w) => onlyWindows.split(",").includes(w.id)) : WINDOWS;
   await runWindows({ browser, windows: wins, base, legacyUrl, outDir, check, proxyRoutes, writes });
+  if (!onlyWindows) await alertsPass({ browser, base, legacyUrl, outDir, check, proxyRoutes });
 } catch (e) {
   check("the run completed", false, String(e && e.message).slice(0, 300));
 } finally {

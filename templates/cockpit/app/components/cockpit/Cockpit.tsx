@@ -7,6 +7,8 @@ import type { HomeView, Opens } from "@shared/cockpit-home";
 import { HEADER_WINDOWS, isNativeWindow, type WindowId } from "@shared/cockpit-windows";
 import { BoardDialog } from "./BoardDialog";
 import { CardDialog } from "./CardDialog";
+import { AlertToasts } from "./AlertToasts";
+import { UpdateBar } from "./UpdateBar";
 import { useCanWrite } from "./viewer";
 import { WindowDialog } from "./WindowDialog";
 import { CardRegion } from "./CardRegion";
@@ -118,6 +120,8 @@ export function Cockpit() {
         </nav>
       </main>
       {h ? <div className="cf-foot">{h.foot}</div> : null}
+      <UpdateBar />
+      <AlertToasts onForge={() => setCardOpen("forge")} />
       <div className="cf-toasts" aria-live="polite">
         {notices.map((n) => (
           <div key={n.id} className={"cf-toast" + (n.bad ? " bad" : "")}>

@@ -1471,3 +1471,109 @@
     display: none;
   }
 }
+
+/* FA-19135: the forge alert toasts (the legacy snackbar) and the "cockpit updated" bar */
+.cf-alerts {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  z-index: 61;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  width: min(440px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.cf-alert {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--sky);
+  background: rgba(6, 16, 29, 0.96);
+  color: var(--tx2);
+  font-size: 12.5px;
+  line-height: 1.45;
+  box-shadow: 0 0 18px rgba(76, 195, 255, 0.18), 0 8px 24px rgba(0, 0, 0, 0.45);
+  animation: cfIn 0.2s ease-out;
+  touch-action: pan-y;
+  cursor: default;
+  user-select: none;
+}
+.cf-alert.bad {
+  border-color: rgba(251, 191, 36, 0.45);
+  border-left-color: var(--amb);
+  color: #fde68a;
+  box-shadow: 0 0 18px rgba(251, 191, 36, 0.18), 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+.cf-alert-t {
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.cf-alert-l,
+.cf-alert-x {
+  flex: none;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--sky);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+.cf-alert-x {
+  text-transform: none;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 7px;
+  color: var(--mute);
+}
+.cf-verbar {
+  position: fixed;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 62;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(76, 195, 255, 0.55);
+  background: rgba(6, 16, 29, 0.97);
+  color: var(--tx);
+  font-size: 12.5px;
+  box-shadow: 0 0 16px var(--glow);
+}
+.cf-verbar button {
+  background: none;
+  border: 0;
+  color: var(--sky);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+  padding: 0;
+}
+@media (max-width: 640px) {
+  .cf-alerts {
+    right: 50%;
+    transform: translateX(50%);
+    bottom: 12px;
+  }
+  .cf-alert {
+    min-height: 44px;
+    align-items: center;
+  }
+  .cf-alert-l,
+  .cf-alert-x {
+    min-height: 32px;
+  }
+}
