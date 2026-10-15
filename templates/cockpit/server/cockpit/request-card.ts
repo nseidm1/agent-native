@@ -92,6 +92,18 @@ export function buildRequestCard(question: string, cls: Pick<Classification, "ti
   };
 }
 
+/**
+ * The filer's environment: the user's basics only, never this server's own. The region server runs with PORT=5241
+ * (and HOST, APP_BASE_PATH, ...); the board CLI reads PORT as the board's port, so an inherited one sent the filer's
+ * note and priority writes to this app instead of the board (FA-19010 was filed with neither). Pure, so it is tested.
+ */
+export const FILER_ENV_KEYS = ["PATH", "HOME", "USER", "LOGNAME", "SHELL", "LANG", "LC_ALL", "LC_CTYPE", "TMPDIR", "TERM", "TZ"] as const;
+export function filerEnv(from: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const env: NodeJS.ProcessEnv = {};
+  for (const k of FILER_ENV_KEYS) if (from[k] !== undefined) env[k] = from[k];
+  return env;
+}
+
 interface ExecOut {
   code: number | null;
   stdout: string;
@@ -101,10 +113,7 @@ interface ExecOut {
 
 function run(file: string, args: string[], cwd: string, timeout: number): Promise<ExecOut> {
   return new Promise((resolve) => {
-    const env = { ...process.env };
-    delete env.CLAUDECODE;
-    delete env.CLAUDE_CODE_ENTRYPOINT;
-    execFile(file, args, { cwd, env, timeout, maxBuffer: 2_000_000 }, (err, stdout, stderr) => {
+    execFile(file, args, { cwd, env: filerEnv(), timeout, maxBuffer: 2_000_000 }, (err, stdout, stderr) => {
       const e = err as (NodeJS.ErrnoException & { code?: number | string; killed?: boolean }) | null;
       resolve({
         code: e ? (typeof e.code === "number" ? e.code : null) : 0,

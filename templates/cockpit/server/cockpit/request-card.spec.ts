@@ -8,7 +8,7 @@ import path from "node:path";
 
 import { askAgent } from "./agent";
 import { buildClassifyArgs, CLASSIFY_SYSTEM_PROMPT, cleanTitle, parseClassification } from "./classify";
-import { buildRequestCard, fileRequestCard, plainText } from "./request-card";
+import { buildRequestCard, fileRequestCard, filerEnv, plainText } from "./request-card";
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
 
@@ -66,6 +66,11 @@ describe("a change request becomes a board card", () => {
     expect(plainText("HOLD: x\n[needs a human] UMBRELLA")).toBe("On hold: x (needs the console) parent");
   });
 
+  it("runs the filer without this server's own environment (PORT would point the board CLI at this app)", () => {
+    const env = filerEnv({ PATH: "/bin", HOME: "/h", PORT: "5241", HOST: "127.0.0.1", APP_BASE_PATH: "/cards", AUTH_DISABLED: "true", ANTHROPIC_API_KEY: "k", CLAUDECODE: "1" });
+    expect(env).toEqual({ PATH: "/bin", HOME: "/h" });
+  });
+
   /** A stand-in parent repo: a filer that records its argv and files FA-77, a board state, a note command. */
   function fakeRepo(opts: { files: boolean }) {
     const root = mkdtempSync(path.join(os.tmpdir(), "cockpit-req-"));
@@ -76,6 +81,7 @@ describe("a change request becomes a board card", () => {
       `import { writeFileSync, readFileSync } from "node:fs";
 const b = process.argv[2];
 writeFileSync(${JSON.stringify(path.join(root, "filer-argv.json"))}, JSON.stringify({ argv: process.argv.slice(2), cwd: process.cwd(), batch: JSON.parse(readFileSync(b, "utf8")) }));
+writeFileSync(${JSON.stringify(path.join(root, "filer-env.json"))}, JSON.stringify({ PORT: process.env.PORT ?? null }));
 ${opts.files ? 'writeFileSync(b.replace(/\\.json$/, "") + ".ids.json", JSON.stringify({ req: "FA-77" }));' : 'console.log("REFUSED, nothing to file:\\n  req: the CHANGE line names no file"); process.exit(1);'}
 `,
     );
@@ -92,6 +98,7 @@ ${opts.files ? 'writeFileSync(b.replace(/\\.json$/, "") + ".ids.json", JSON.stri
     process.env.COCKPIT_PORTFOLIO_DIR = root;
     process.env.COCKPIT_DATA_DIR = path.join(root, "data");
     process.env.COCKPIT_BOARD_URL = "http://127.0.0.1:9"; // nothing listens: the folder fallback
+    process.env.PORT = "5241"; // as the live server runs
     try {
       const r = await fileRequestCard("Add a search; rm -rf / $(whoami)", { kind: "change", title: "Search", area: "dialog", ok: true }, [
         { bytes: PNG, ext: "png", type: "image/png" },
@@ -101,6 +108,7 @@ ${opts.files ? 'writeFileSync(b.replace(/\\.json$/, "") + ".ids.json", JSON.stri
       const seen = JSON.parse(readFileSync(path.join(root, "filer-argv.json"), "utf8"));
       expect(seen.argv).toHaveLength(1); // the batch path alone; the request travels inside the JSON, never as argv or shell
       expect(realpathSync(seen.cwd)).toBe(realpathSync(root));
+      expect(JSON.parse(readFileSync(path.join(root, "filer-env.json"), "utf8")).PORT).toBeNull();
       expect(seen.batch[0].note).toContain('"Add a search; rm -rf / $(whoami)"');
       const saved = path.join(root, ".tmp", "lane", "maint", "run", "ask-attachments", "FA-77", "ask-request-1.png");
       expect(readFileSync(saved)).toEqual(PNG);
@@ -111,6 +119,7 @@ ${opts.files ? 'writeFileSync(b.replace(/\\.json$/, "") + ".ids.json", JSON.stri
       delete process.env.COCKPIT_PORTFOLIO_DIR;
       delete process.env.COCKPIT_DATA_DIR;
       delete process.env.COCKPIT_BOARD_URL;
+      delete process.env.PORT;
     }
   });
 

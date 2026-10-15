@@ -17,8 +17,9 @@ import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
 
 const args = process.argv.slice(2);
-const outDir = path.resolve(args.find((a) => !a.startsWith("--") && args[args.indexOf(a) - 1] !== "--base") || "shots");
+const outDir = path.resolve(args.find((a) => !a.startsWith("--") && !["--base", "--id"].includes(args[args.indexOf(a) - 1])) || "shots");
 const fileCard = args.includes("--file-card");
+const searchId = args.includes("--id") ? args[args.indexOf("--id") + 1] : "";
 const base = (args.includes("--base") ? args[args.indexOf("--base") + 1] : "http://127.0.0.1:5207").replace(/\/$/, "");
 const APP = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 mkdirSync(outDir, { recursive: true });
@@ -99,7 +100,10 @@ async function boardSearch(page, frame, label, id) {
   const rowsBefore = await dlg.locator(".cp-tbl tbody tr:not(.cp-xr)").count();
   const target = id || (await dlg.locator(".cp-tbl tbody tr:not(.cp-xr) td.first").first().innerText()).trim();
   await search.fill(target);
-  await frame.waitForFunction(() => document.querySelector('[data-testid="detail-search-count"]'), null, { timeout: 5_000 });
+  // a card filed a moment ago reaches the dialog on its next read of the cockpit state (the dialog refetches every 5 s)
+  await frame
+    .waitForFunction(() => /card/.test(document.querySelector('[data-testid="detail-search-count"]')?.textContent || ""), null, { timeout: 30_000 })
+    .catch(() => {});
   const firsts = await dlg.locator(".cp-tbl tbody tr:not(.cp-xr) td.first").allInnerTexts();
   const count = await dlg.locator('[data-testid="detail-search-count"]').innerText();
   check(`${label}: Board dialog has a search field`, true, `placeholder "${await search.getAttribute("placeholder")}"`);
@@ -164,7 +168,7 @@ try {
   }
 
   // (c) the Board dialog's search, desktop
-  const searched = await boardSearch(page, frame, "1280", filedFa);
+  const searched = await boardSearch(page, frame, "1280", filedFa || searchId);
   check("1280: no sideways scroll", !(await hScroll(frame)) && !(await pageHScroll(page)));
 
   // (c) phone
