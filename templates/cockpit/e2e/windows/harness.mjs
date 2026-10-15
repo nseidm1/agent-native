@@ -30,9 +30,14 @@ export async function runWindows({ browser, windows, base, legacyUrl, outDir, ch
   mkdirSync(dir, { recursive: true });
   for (const width of widths) {
     const phone = width < 600;
-    const ctx = await browser.newContext(phone ? { viewport: { width, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : { viewport: { width, height: 900 } });
-    if (proxyRoutes) await proxyRoutes(ctx);
-    const lp = await ctx.newPage(), np = await ctx.newPage();
+    const opts = phone ? { viewport: { width, height: 844 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 } : { viewport: { width, height: 900 } };
+    // the legacy page and the agent-native page each get their OWN browser context: a context shares one HTTP/1.1 pool of six
+    // connections per origin, and the legacy studio holds several of them open (its event streams and its staging frames' live-reload
+    // feeds), which starved the agent-native page's reads (FA-19087: the Apps window stuck on "Reading the cockpit..." beside the
+    // legacy Agent chat). A person has one page; the test must not make the two pages share one pool.
+    const ctx = await browser.newContext(opts), lctx = await browser.newContext(opts);
+    if (proxyRoutes) { await proxyRoutes(ctx); await proxyRoutes(lctx); }
+    const lp = await lctx.newPage(), np = await ctx.newPage();
     const errs = [];
     // FA-19174: the live staging app's own console (its frame's framebust, its event feed) is the app's, not the cockpit's
     const appFrame = (m) => /\/frame\/(?:s|p|v-[0-9a-f]+)\//.test((m.location() && m.location().url) || "");
@@ -75,6 +80,7 @@ export async function runWindows({ browser, windows, base, legacyUrl, outDir, ch
     }
     check(`windows at ${width}: no console errors or failed requests`, errs.length === 0, errs.slice(0, 4).join(" | "));
     await ctx.close();
+    await lctx.close();
   }
 }
 
