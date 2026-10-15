@@ -265,7 +265,8 @@ export async function askAgent(
       // 2a. a change is never executed here: it becomes a board card carrying the request and its images
       filed = await (deps.fileRequest ?? fileRequestCard)(q, cls, decoded);
       const imgs = filed.attached === "board" ? ` ${filed.images.length} image${filed.images.length === 1 ? "" : "s"} attached to the card.` : filed.attached === "folder" ? ` Images saved and named on the card: ${filed.images.join(", ")}.` : "";
-      return { answer: `Filed ${filed.fa}: ${filed.title}.${imgs}`, layoutChanged: false, kind, card: filed };
+      const head = filed.again ? `Already filed as ${filed.fa}: ${filed.title} (asked again; noted on the card, nothing new filed).` : `Filed ${filed.fa}: ${filed.title}.`;
+      return { answer: head + imgs, layoutChanged: false, kind, card: filed };
     }
     // 2b. layout and read: today's agent run, four region tools and nothing else
     const cfg = path.join(dir, "mcp-config.json");

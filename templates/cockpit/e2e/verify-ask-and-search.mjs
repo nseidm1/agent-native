@@ -158,7 +158,7 @@ try {
     const built0 = builtAt();
     const t0 = Date.now();
     const r = await ask(frame, "Add a search button to the board card's dialog");
-    const m = /^Filed (FA-\d+): /.exec(r.text || "");
+    const m = /^(?:Filed|Already filed as) (FA-\d+): /.exec(r.text || "");
     filedFa = m ? m[1] : "";
     check("change request takes the change path", r.kind === "change", `${r.kind}: ${r.text} | ${r.meta}`);
     check("change request replies with the filed card number", !!filedFa, r.text);

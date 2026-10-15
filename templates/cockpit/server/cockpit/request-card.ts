@@ -152,6 +152,39 @@ export interface FiledRequest {
   /** "board": on the card; "folder": saved beside the lane state and named in the note; "none": no images. */
   attached: "board" | "folder" | "none";
   images: string[];
+  /** true: the same request was already a card (same title); the images and an ASKED AGAIN note went onto it. */
+  again?: boolean;
+}
+
+/** The filer's reason lines: each NOT FILED / REFUSED header and the line under it. Pure. */
+export function filerWhy(out: string): string {
+  const lines = out.split("\n").map((x) => x.trim());
+  const why: string[] = [];
+  lines.forEach((x, i) => {
+    if (/^(REFUSED|NOT FILED)/.test(x) && lines[i + 1]) why.push(lines[i + 1]);
+    else if (/NOT CREATED|Error:/.test(x)) why.push(x);
+  });
+  return [...new Set(why)].slice(0, 3).join(" ");
+}
+
+/** A board card id is the slug of its title (a long one cut short). Pure. */
+export const titleSlug = (t: string) =>
+  t
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+
+/** The FA number of the card holding exactly this title, read from the board's own state. */
+async function faOfTitle(root: string, title: string): Promise<string | null> {
+  try {
+    const st = JSON.parse(await readFile(path.join(root, "tools", "board", "board.json"), "utf8"));
+    const slug = titleSlug(title);
+    const hits = Object.entries((st && st.tickets) || {}).filter(([id]) => id === slug || (id.length >= 40 && slug.startsWith(id)));
+    const fa = hits.length === 1 ? hits[0][1] : hits.find(([id]) => id === slug)?.[1];
+    return typeof fa === "string" && /^FA-\d{1,6}$/.test(fa) ? fa : null;
+  } catch {
+    return null;
+  }
 }
 
 export async function fileRequestCard(question: string, cls: Classification, images: DecodedImage[]): Promise<FiledRequest> {
@@ -171,16 +204,17 @@ export async function fileRequestCard(question: string, cls: Classification, ima
   } catch {
     fa = "";
   }
+  let again = false;
   if (!/^FA-\d{1,6}$/.test(fa)) {
-    const why = (r.stdout + "\n" + r.stderr)
-      .split("\n")
-      .map((x) => x.trim())
-      .filter((x) => /REFUSED|NOT FILED|error|Error/.test(x))
-      .slice(0, 3)
-      .join(" ");
-    throw new AgentError("The change request was not filed: " + (why || r.error || firstLine(r.stderr) || `the filer exited ${r.code}`));
+    const out = r.stdout + "\n" + r.stderr;
+    // the same request asked again: the board refuses a second card with this title; answer with the one it has
+    const existing = /already exists/.test(out) ? await faOfTitle(root, card.title) : null;
+    if (!existing) throw new AgentError("The change request was not filed: " + (filerWhy(out) || r.error || firstLine(r.stderr) || `the filer exited ${r.code}`));
+    fa = existing;
+    again = true;
+    await run(process.execPath, [path.join(root, "tools", "board", "cli.mjs"), "note", fa, "ASKED AGAIN (" + new Date().toISOString() + "), verbatim: \"" + plainText(question).slice(0, REQUEST_NOTE_MAX) + "\""], root, 30_000);
   }
-  if (!images.length) return { fa, title: card.title, attached: "none", images: [] };
+  if (!images.length) return { fa, title: card.title, attached: "none", images: [], again };
 
   const names = images.map((im, i) => `ask-request-${i + 1}.${im.ext}`);
   // on the card itself, through the board's loopback attach route
@@ -200,7 +234,7 @@ export async function fileRequestCard(question: string, cls: Classification, ima
         // falls through to the folder
       }
     }
-    if (ok === images.length) return { fa, title: card.title, attached: "board", images: names };
+    if (ok === images.length) return { fa, title: card.title, attached: "board", images: names, again };
   }
   // the board could not take them: saved beside the lane state, and the card's note names the paths
   const folder = path.join(root, ".tmp", "lane", "maint", "run", "ask-attachments", fa);
@@ -212,5 +246,5 @@ export async function fileRequestCard(question: string, cls: Classification, ima
     paths.push(path.relative(root, p));
   }
   await run(process.execPath, [path.join(root, "tools", "board", "cli.mjs"), "note", fa, "IMAGES attached to the request: " + paths.join(", ")], root, 30_000);
-  return { fa, title: card.title, attached: "folder", images: paths };
+  return { fa, title: card.title, attached: "folder", images: paths, again };
 }

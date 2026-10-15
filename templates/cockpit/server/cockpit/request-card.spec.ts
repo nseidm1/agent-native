@@ -8,7 +8,7 @@ import path from "node:path";
 
 import { askAgent } from "./agent";
 import { buildClassifyArgs, CLASSIFY_SYSTEM_PROMPT, cleanTitle, parseClassification } from "./classify";
-import { buildRequestCard, fileRequestCard, filerEnv, plainText } from "./request-card";
+import { buildRequestCard, fileRequestCard, filerEnv, filerWhy, plainText, titleSlug } from "./request-card";
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4]);
 
@@ -72,7 +72,7 @@ describe("a change request becomes a board card", () => {
   });
 
   /** A stand-in parent repo: a filer that records its argv and files FA-77, a board state, a note command. */
-  function fakeRepo(opts: { files: boolean }) {
+  function fakeRepo(opts: { files: boolean; dup?: boolean }) {
     const root = mkdtempSync(path.join(os.tmpdir(), "cockpit-req-"));
     mkdirSync(path.join(root, "tools", "lane"), { recursive: true });
     mkdirSync(path.join(root, "tools", "board"), { recursive: true });
@@ -82,14 +82,14 @@ describe("a change request becomes a board card", () => {
 const b = process.argv[2];
 writeFileSync(${JSON.stringify(path.join(root, "filer-argv.json"))}, JSON.stringify({ argv: process.argv.slice(2), cwd: process.cwd(), batch: JSON.parse(readFileSync(b, "utf8")) }));
 writeFileSync(${JSON.stringify(path.join(root, "filer-env.json"))}, JSON.stringify({ PORT: process.env.PORT ?? null }));
-${opts.files ? 'writeFileSync(b.replace(/\\.json$/, "") + ".ids.json", JSON.stringify({ req: "FA-77" }));' : 'console.log("REFUSED, nothing to file:\\n  req: the CHANGE line names no file"); process.exit(1);'}
+${opts.files ? 'writeFileSync(b.replace(/\\.json$/, "") + ".ids.json", JSON.stringify({ req: "FA-77" }));' : opts.dup ? 'console.log("req NOT CREATED: a task with this title already exists\\nNOT FILED (1 of 1):\\n  req: not created, a task with this title already exists"); process.exit(1);' : 'console.log("REFUSED, nothing to file:\\n  req: the CHANGE line names no file"); process.exit(1);'}
 `,
     );
     writeFileSync(
       path.join(root, "tools", "board", "cli.mjs"),
       `import { appendFileSync } from "node:fs"; appendFileSync(${JSON.stringify(path.join(root, "notes.log"))}, JSON.stringify(process.argv.slice(2)) + "\\n");`,
     );
-    writeFileSync(path.join(root, "tools", "board", "board.json"), JSON.stringify({ tickets: { "cockpit-region-x": "FA-77" } }));
+    writeFileSync(path.join(root, "tools", "board", "board.json"), JSON.stringify({ tickets: { "cockpit-region-x": "FA-77", "cockpit-region-search": "FA-78" } }));
     return root;
   }
 
@@ -128,11 +128,31 @@ ${opts.files ? 'writeFileSync(b.replace(/\\.json$/, "") + ".ids.json", JSON.stri
     process.env.COCKPIT_PORTFOLIO_DIR = root;
     process.env.COCKPIT_DATA_DIR = path.join(root, "data");
     try {
-      await expect(fileRequestCard("x", { kind: "change", title: "x", area: "region", ok: true }, [])).rejects.toThrow(/not filed: REFUSED/);
+      await expect(fileRequestCard("x", { kind: "change", title: "x", area: "region", ok: true }, [])).rejects.toThrow(
+        /not filed: req: the CHANGE line names no file/,
+      );
     } finally {
       delete process.env.COCKPIT_PORTFOLIO_DIR;
       delete process.env.COCKPIT_DATA_DIR;
     }
+  });
+
+  it("answers the same request asked again with the card it already is, and notes the repeat on it", async () => {
+    const root = fakeRepo({ files: false, dup: true });
+    process.env.COCKPIT_PORTFOLIO_DIR = root;
+    process.env.COCKPIT_DATA_DIR = path.join(root, "data");
+    try {
+      const r = await fileRequestCard("Add a search", { kind: "change", title: "Search", area: "dialog", ok: true }, []);
+      expect(r).toMatchObject({ fa: "FA-78", again: true, attached: "none" });
+      const note = JSON.parse(readFileSync(path.join(root, "notes.log"), "utf8").trim());
+      expect(note.slice(0, 2)).toEqual(["note", "FA-78"]);
+      expect(note[2]).toMatch(/^ASKED AGAIN .*"Add a search"$/);
+    } finally {
+      delete process.env.COCKPIT_PORTFOLIO_DIR;
+      delete process.env.COCKPIT_DATA_DIR;
+    }
+    expect(titleSlug("Cockpit region: Search button in the Board card dialog")).toBe("cockpit-region-search-button-in-the-board-card-dialog");
+    expect(filerWhy("x\nNOT FILED (1 of 1):\n  req: not created, a task with this title already exists\n")).toBe("req: not created, a task with this title already exists");
   });
 
   it("routes a change to the filer and never starts the agent; a layout ask runs the agent", async () => {
