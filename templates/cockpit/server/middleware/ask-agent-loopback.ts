@@ -15,7 +15,15 @@ const ROUTE = new RegExp(`/_agent-native/actions/(${LOOPBACK_ONLY_ACTIONS.join("
  * (front.mjs REMOTE_WRITE_ROUTE). The legacy page let exactly those callers write; the Ask agent's code-editing path
  * (ask-agent, undo-ask-change) and the generic cockpit-act are never on this list.
  */
-export const REMOTE_VERIFIED_ACTIONS: readonly string[] = WRITE_ACTION_NAMES;
+export const REMOTE_VERIFIED_ACTIONS: readonly string[] = [...WRITE_ACTION_NAMES, "undo-ask-change"];
+/**
+ * FA-19087 THE ASK AGENT FROM THE PHONE (Portfolio MI-388; console 2026-10-15 ~08:15Z: the console talks to and USES the Ask agent from the
+ * phone). ask-agent answers a remote viewer whatever the mark: the front sends it marked verified for a PAIRED phone (the cockpit's own write
+ * gate admits the board token), and the action applies that viewer's change through the same gated path; unmarked, the action answers reads,
+ * keeps the layout as it is and files a change as a board card (actions/ask-agent.ts askCaller). undo-ask-change from a remote viewer needs
+ * the mark (REMOTE_VERIFIED_ACTIONS). cockpit-act stays loopback only.
+ */
+export const REMOTE_ASK_ACTIONS: readonly string[] = ["ask-agent"];
 const VIEWER = /\/_agent-native\/actions\/get-viewer\/?$/;
 
 /**
@@ -23,8 +31,9 @@ const VIEWER = /\/_agent-native\/actions\/get-viewer\/?$/;
  * directly (X-Forwarded-For is ignored: a header is not proof of where a
  * request came from). The cockpit's front proxy runs on this host and passes
  * its caller's real address as x-cockpit-peer; a non-loopback peer there is
- * refused, unless the action is a cockpit-* forwarding write and the front
- * marked the request verified (the cockpit's write gate admitted that caller).
+ * refused, unless the action is a cockpit-* forwarding write or undo-ask-change
+ * and the front marked the request verified (the cockpit's write gate admitted
+ * that caller), or it is ask-agent, which decides from the mark itself.
  * This server listens on loopback only, so only a process on this Mac (the
  * front) can set either header, and the front strips both from its callers.
  */
@@ -33,10 +42,19 @@ export function loopbackOnlyRefusal(pathname: string, socketIp: string | undefin
   if (!m) return null;
   if (!isLoopbackAddress(socketIp)) return `${m[1]} answers loopback requests only`;
   if (peerHeader && !isLoopbackAddress(peerHeader)) {
+    if (REMOTE_ASK_ACTIONS.includes(m[1])) return null;
     if (writeHeader === "verified" && REMOTE_VERIFIED_ACTIONS.includes(m[1])) return null;
     return `${m[1]} is read-only on this device`;
   }
   return null;
+}
+
+/**
+ * MI-388: whether an ask-agent caller may APPLY a change (and rearrange the layout): this Mac, or a remote viewer the front marked verified
+ * (a paired phone). Anyone else gets reads, an unchanged layout and its change requests filed as cards.
+ */
+export function askerCanApply(peerHeader: string | undefined | null, writeHeader: string | undefined | null): boolean {
+  return !peerHeader || isLoopbackAddress(peerHeader) || writeHeader === "verified";
 }
 
 /** Whether this viewer's cockpit writes will be admitted: this Mac, or a remote viewer the cockpit's write gate admits (the front's mark). */

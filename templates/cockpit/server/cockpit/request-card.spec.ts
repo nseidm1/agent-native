@@ -195,10 +195,10 @@ ${opts.files ? 'writeFileSync(b.replace(/\\.json$/, "") + ".ids.json", JSON.stri
         canApply: false,
       });
       expect(remote.kind).toBe("change");
-      expect(remote.answer).toMatch(/from here it was filed instead/);
+      expect(remote.answer).toMatch(/from this device it was filed instead/);
       expect(apply).toHaveBeenCalledTimes(1);
       expect(fileRequest).toHaveBeenCalledTimes(2);
-      expect((fileRequest.mock.calls[1] as unknown[])[3]).toMatch(/read-only from remote/);
+      expect((fileRequest.mock.calls[1] as unknown[])[3]).toMatch(/neither this Mac nor a paired phone/);
 
       const layout = await askAgent("move halo to the top", "dev@local.test", [], {
         classify: async () => ({ kind: "layout", title: "", area: "region", ok: true }),

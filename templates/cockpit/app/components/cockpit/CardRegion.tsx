@@ -15,6 +15,7 @@ import { AppliedBanner, ApplyProgress } from "./ApplyStatus";
 import { ensureUiCapability } from "@/lib/ui-capability";
 import { BoardDialog } from "./BoardDialog";
 import { CardDialog } from "./CardDialog";
+import { useCanWrite } from "./viewer";
 import { type AskImage, MAX_ASK_IMAGES, precheckImageFile, sniffImageType } from "@shared/ask-images";
 
 const GLYPH: Record<Tone, string> = { g: "✓", a: "⚠", r: "✕", d: "–" };
@@ -153,6 +154,8 @@ function AskPanel({ onClose }: { onClose: () => void }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const imagesRef = useRef<Attached[]>([]);
   imagesRef.current = images;
+  // MI-388: this Mac and a paired phone apply changes; any other device reads and files (the same verdict the region applies, get-viewer)
+  const canApply = useCanWrite();
   const ask = useActionMutation<AskReply, { question: string; images?: AskImage[] }>("ask-agent", {
     // classifier (30 s) + the agent run (120 s) or the card filer (120 s)
     timeoutMs: 280_000,
@@ -308,6 +311,11 @@ function AskPanel({ onClose }: { onClose: () => void }) {
           ? "Drop to attach"
           : `A change to this region is applied live by the code agent once scope, typecheck, tests, build and a Playwright check pass, with Undo after; a request that needs the system side is filed as a board card. Images: attach, paste or drop · up to ${MAX_ASK_IMAGES}, 5 MB each, PNG/JPEG/WebP/GIF`}
       </div>
+      {canApply ? null : (
+        <div className="cp-ask-hint" data-testid="ask-unpaired">
+          This device is not paired: questions are answered and changes are filed as board cards. Sign in with the board token to apply changes from here.
+        </div>
+      )}
       {attachErr ? (
         <div className="cp-ask-out err" role="alert">
           {attachErr}

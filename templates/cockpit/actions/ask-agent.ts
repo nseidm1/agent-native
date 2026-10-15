@@ -2,7 +2,8 @@ import { defineAction, fail } from "@agent-native/core/action";
 import { z } from "zod";
 
 import { ASK_AGENT_MAX_BODY_BYTES, MAX_ASK_IMAGES } from "../shared/ask-images.js";
-import { AgentError, askAgent, isLoopbackAddress } from "../server/cockpit/agent.js";
+import { AgentError, askAgent } from "../server/cockpit/agent.js";
+import { askerCanApply } from "../server/middleware/ask-agent-loopback.js";
 
 /**
  * The "Ask agent" panel. Each ask is first classified by a tool-less CLI call
@@ -14,7 +15,9 @@ import { AgentError, askAgent, isLoopbackAddress } from "../server/cockpit/agent
  * run the Mac's logged-in Claude Code CLI against this
  * app's own MCP tools (get-cards, get-card-detail, get-layout, set-layout) and nothing else;
  * UI only: never an agent or MCP tool, so a run cannot start another run.
- * server/middleware/ask-agent-loopback.ts refuses any non-loopback request.
+ * server/middleware/ask-agent-loopback.ts admits this Mac and, through the cockpit's front, a remote viewer:
+ * a PAIRED phone (the front's x-cockpit-write: verified mark, Portfolio MI-388) applies changes exactly as this
+ * Mac does; an unpaired one gets reads, an unchanged layout and its change requests filed as cards.
  * Up to 3 images ride along as base64; the body bound is sized to exactly
  * three 5 MB images plus the question (ASK_AGENT_MAX_BODY_BYTES), and each
  * image is checked by its magic bytes server-side (server/cockpit/agent.ts).
@@ -42,9 +45,8 @@ export default defineAction({
   mcpTool: false,
   run: async ({ question, images }, ctx) => {
     try {
-      // the middleware already refuses a remote caller; this is the second check, so a change from off this Mac is filed, never applied
-      const peer = ctx?.requestHeaders?.get("x-cockpit-peer");
-      const canApply = !peer || isLoopbackAddress(peer);
+      // MI-388: this Mac or a paired phone (the front's mark) applies; any other remote viewer reads and files, and never moves the layout
+      const canApply = askerCanApply(ctx?.requestHeaders?.get("x-cockpit-peer"), ctx?.requestHeaders?.get("x-cockpit-write"));
       return await askAgent(question, ctx?.userEmail, images ?? [], { canApply });
     } catch (e) {
       // the CLI's own error line (missing, logged out, timed out) reaches the panel

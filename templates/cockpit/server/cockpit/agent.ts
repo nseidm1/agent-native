@@ -66,6 +66,10 @@ export const AGENT_SYSTEM_PROMPT =
   "cockpit-manifest lists everything the cockpit offers and cockpit-read reads any of it. Change layout only through set-layout. " +
   "Read get-layout before changing it, send the whole layout back with only the requested change, and answer in one or two short sentences.";
 
+/** MI-388: appended for a viewer that may not change anything (an unpaired remote device). */
+export const READ_ONLY_VIEWER_PROMPT =
+  "This viewer is on a device that is not paired with the cockpit, so you cannot change the layout here: answer reads, and for a layout change say that it needs this Mac or a phone signed in with the board token.";
+
 export const dataDir = () => path.resolve(process.env.COCKPIT_DATA_DIR || path.join(process.cwd(), "data", "cockpit-agent"));
 export const claudeBin = () => process.env.COCKPIT_CLAUDE_BIN || path.join(os.homedir(), ".local", "bin", "claude");
 const mcpUrl = () =>
@@ -95,8 +99,12 @@ export function promptWithImages(question: string, imagePaths: string[]): string
 }
 
 /** The argv for one run. Pure, so the bounds are testable without spawning. */
-export function buildArgs(question: string, mcpConfigPath: string, imagePaths: string[] = []): string[] {
-  const allowed = [...ALLOWED_TOOLS, ...imagePaths.map(readRuleFor)];
+export function buildArgs(question: string, mcpConfigPath: string, imagePaths: string[] = [], opts: { layoutWrites?: boolean } = {}): string[] {
+  // MI-388: a viewer that may not apply (an unpaired remote device) is not offered set-layout at all: reads only
+  const layoutWrites = opts.layoutWrites !== false;
+  const setLayout = `mcp__${MCP_SERVER_NAME}__set-layout`;
+  const allowed = [...ALLOWED_TOOLS.filter((t) => layoutWrites || t !== setLayout), ...imagePaths.map(readRuleFor)];
+  const disallowed = layoutWrites ? DISALLOWED_TOOLS : [...DISALLOWED_TOOLS, setLayout];
   return [
     "-p",
     "--output-format",
@@ -111,12 +119,12 @@ export function buildArgs(question: string, mcpConfigPath: string, imagePaths: s
     "--allowedTools",
     allowed.join(","),
     "--disallowedTools",
-    DISALLOWED_TOOLS.join(","),
+    disallowed.join(","),
     "--permission-mode",
     "dontAsk",
     "--no-session-persistence",
     "--append-system-prompt",
-    AGENT_SYSTEM_PROMPT,
+    layoutWrites ? AGENT_SYSTEM_PROMPT : AGENT_SYSTEM_PROMPT + " " + READ_ONLY_VIEWER_PROMPT,
     // after "--" the question is a positional prompt, never parsed as a flag
     "--",
     promptWithImages(question, imagePaths),
@@ -240,7 +248,7 @@ export interface AskDeps {
   fileRequest?: typeof fileRequestCard;
   runAgent?: typeof runCli;
   apply?: (input: ApplyInput, cls: Classification) => ApplyJob;
-  /** false for a caller that is not on this Mac: a change is filed, never applied (the region is read-only from remote). */
+  /** false for a caller that is neither this Mac nor a paired phone (MI-388): a change is filed, never applied, and the layout is never moved. */
   canApply?: boolean;
 }
 
@@ -307,11 +315,11 @@ export async function askAgent(
     }
     if (cls.kind === "change" || cls.kind === "system") {
       // 2b. the system side, or a change asked from a remote device: filed as a board card with its images, never executed here
-      const why = cls.kind === "change" ? "asked from a device that is not this Mac; the card region is read-only from remote, so the change was filed instead of applied" : "it needs the system side (data or an action the cockpit's client does not serve yet, or behaviour outside the card region)";
+      const why = cls.kind === "change" ? "asked from a device that is neither this Mac nor a paired phone, so the change was filed instead of applied" : "it needs the system side (data or an action the cockpit's client does not serve yet, or behaviour outside the card region)";
       filed = await (deps.fileRequest ?? fileRequestCard)(q, cls, decoded, why);
       const imgs = filed.attached === "board" ? ` ${filed.images.length} image${filed.images.length === 1 ? "" : "s"} attached to the card.` : filed.attached === "folder" ? ` Images saved and named on the card: ${filed.images.join(", ")}.` : "";
       const head = filed.again ? `Already filed as ${filed.fa}: ${filed.title} (asked again; noted on the card, nothing new filed).` : `Filed ${filed.fa}: ${filed.title}.`;
-      const reason = cls.kind === "change" ? " Changes apply only from the cockpit's own Mac; from here it was filed instead." : " It needs the system side, so it was filed rather than applied.";
+      const reason = cls.kind === "change" ? " Changes apply from this Mac or a phone signed in with the board token; from this device it was filed instead." : " It needs the system side, so it was filed rather than applied.";
       return { answer: head + reason + imgs, layoutChanged: false, kind: cls.kind, card: filed };
     }
     // 2b. layout and read: today's agent run, four region tools and nothing else
@@ -330,7 +338,7 @@ export async function askAgent(
       }
     }
     const before = JSON.stringify(await readLayout());
-    const r = await (deps.runAgent ?? runCli)(buildArgs(q, cfg, imagePaths), cwd);
+    const r = await (deps.runAgent ?? runCli)(buildArgs(q, cfg, imagePaths, { layoutWrites: deps.canApply !== false }), cwd);
     exit = r.code;
     layoutChanged = JSON.stringify(await readLayout()) !== before;
     if (r.spawnError) throw new AgentError(r.spawnError);

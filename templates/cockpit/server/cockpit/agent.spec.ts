@@ -43,6 +43,16 @@ describe("ask-agent bounds", () => {
     expect(args.filter((a) => a === "--dangerously-skip-permissions")).toHaveLength(1);
   });
 
+  it("MI-388: a viewer that may not apply is never offered set-layout, and is told so", () => {
+    const args = buildArgs("move halo to the top", "/x/mcp.json", [], { layoutWrites: false });
+    expect(args[args.indexOf("--allowedTools") + 1]).toBe(ALLOWED_TOOLS.filter((t) => !t.endsWith("__set-layout")).join(","));
+    expect(args[args.indexOf("--disallowedTools") + 1]).toContain("mcp__cockpit__set-layout");
+    expect(args[args.indexOf("--append-system-prompt") + 1]).toMatch(/not paired/);
+    const full = buildArgs("move halo to the top", "/x/mcp.json");
+    expect(full[full.indexOf("--allowedTools") + 1]).toContain("mcp__cockpit__set-layout");
+    expect(full[full.indexOf("--disallowedTools") + 1]).not.toContain("set-layout");
+  });
+
   it("names the signed-in owner to the app's own MCP endpoint", () => {
     const cfg = buildMcpConfig("dev@local.test");
     expect(cfg.mcpServers.cockpit.url).toMatch(/^http:\/\/127\.0\.0\.1:\d+\/_agent-native\/mcp$/);

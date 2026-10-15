@@ -34,9 +34,12 @@ the copy), `act(name, input)` (input checked against the manifest schema first) 
 - `get-layout` (GET) / `set-layout` (POST): app state key `cockpit-layout`
   `{ bands: [{ id, title, cards }], hidden, size: { id: s|m|l } }`. `set-layout` refuses any unknown card id
   (400, `unknown_card_id`) and writes nothing; validation lives in `shared/cockpit.ts`.
-- `ask-agent` (POST, UI only, loopback only): runs the Mac's logged-in Claude Code CLI with the read tools
-  above and `set-layout` over this app's MCP endpoint (`server/cockpit/agent.ts`). A change request becomes a
-  board card; it never edits code and never writes to the cockpit.
+- `ask-agent` (POST, UI only): runs the Mac's logged-in Claude Code CLI with the read tools above and
+  `set-layout` over this app's MCP endpoint (`server/cockpit/agent.ts`); a frontend change is applied behind
+  the gates (`server/cockpit/apply/`), a system request becomes a board card. Who may apply (Portfolio MI-388):
+  this Mac, or a phone the cockpit's front marks `x-cockpit-write: verified` (paired with the board token).
+  Any other remote viewer gets reads only, no `set-layout`, and its change requests filed as cards.
+  `undo-ask-change` needs the same: this Mac or a paired phone. It never writes to the cockpit.
 - `view-screen`, `navigate`: what the region shows (layout + headlines), and navigation.
 
 ## Rules
