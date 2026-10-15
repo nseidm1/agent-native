@@ -11,6 +11,9 @@ export type WindowBuilder = (args: WindowArgs) => Promise<WindowDetail>;
 /** One line per window: its builder module (each exports default a WindowBuilder). */
 const BUILDERS: Partial<Record<WindowId, () => Promise<WindowBuilder>>> = {
   push: () => import("./push.js").then((m) => m.default),
+  overview: () => import("./overview.js").then((m) => m.default),
+  agents: () => import("./agents.js").then((m) => m.default),
+  queue: () => import("./queue.js").then((m) => m.default),
 };
 
 /** The ids with a builder: the page renders these natively, the rest still open the legacy window. */

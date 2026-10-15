@@ -6,7 +6,7 @@
  *   the account chip, the master and push counts, the lock / Client / Production switches, the Budget, the six
  *   office tiles, the three faces, the drafting-mode face and the nine key-number tiles;
  *   no console errors and no sideways scroll at either width; the card region is inline (no iframe);
- *   a face opens its window (Speed -> the scorecard dialog; Overview -> the legacy window at the fallback path);
+ *   a face opens its window (Speed -> the scorecard dialog; Overview -> the agent-native Overview window, no legacy frame);
  *   WRITES ROUND-TRIP through the client: the lock is clicked twice (it returns to where it was, each click read
  *   back from the client), and the Budget's Auto is re-sent while Auto (a write that changes nothing).
  * Screenshots of both pages go to the directory given first.
@@ -135,7 +135,7 @@ async function homePass() {
   check("the card region is inline (no iframe), with its 14 cards", (await np.locator("iframe").count()) === 0 && (await np.locator(".cf-launch .cp-card").count()) === 14);
   check("no sideways scroll at 1280", (await np.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0);
 
-  // 2. a face opens its window: Speed -> the scorecard dialog (the region's own), Overview -> the legacy window at the fallback path
+  // 2. a face opens its window: Speed -> the scorecard dialog (the region's own), Overview -> the agent-native Overview window (FA-19130)
   await np.click("[data-face=speed]");
   const dlg = np.getByRole("dialog");
   await dlg.first().waitFor({ state: "visible", timeout: 15_000 });
@@ -144,13 +144,11 @@ async function homePass() {
   await np.keyboard.press("Escape");
   await np.waitForTimeout(500);
   await np.click("[data-face=overview]");
-  const lw = np.locator("[data-testid=cf-legacy] iframe");
-  await lw.waitFor({ state: "visible", timeout: 15_000 });
-  const fr = await (await lw.elementHandle()).contentFrame();
-  const opened = await fr.waitForFunction(() => { const d = document.getElementById("secDlg"); return d && d.open && /overview/i.test(document.getElementById("secH").textContent); }, null, { timeout: 30_000 }).then(() => true, () => false);
-  check("Overview opens the legacy Overview window at the fallback path", opened);
+  const ow = np.locator("[data-testid=cf-window][data-window=overview]");
+  const opened = await ow.locator("[data-testid=ov-strict]").waitFor({ state: "visible", timeout: 30_000 }).then(() => true, () => false);
+  check("Overview opens the agent-native Overview window", opened && (await np.locator("[data-testid=cf-legacy]").count()) === 0);
   await np.screenshot({ path: path.join(outDir, "agent-native-1280-overview.png") });
-  await np.click("[data-testid=cf-legacy] .cf-legacy-bar button");
+  await np.keyboard.press("Escape");
   await np.waitForTimeout(400);
 
   // 3. writes round-trip through the client

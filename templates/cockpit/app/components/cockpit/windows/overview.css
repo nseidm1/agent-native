@@ -1,0 +1,200 @@
+/* FA-19130: the Overview window's strictness block (OverviewPart.tsx). The Part is mounted above the sections; in the
+   body's flex column it is ordered after them (the Production cards box is the last section), before the "Live · read" line. */
+.cf-win[data-window="overview"] .ov-strict {
+  order: 1;
+}
+.cf-win[data-window="overview"] .cp-dlg-b > .cp-at {
+  order: 2;
+}
+.ov-strict {
+  border-color: rgba(76, 195, 255, 0.45);
+  box-shadow: inset 0 0 18px rgba(76, 195, 255, 0.08), 0 0 14px rgba(76, 195, 255, 0.08);
+}
+.ov-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--tx2);
+  background: rgba(76, 195, 255, 0.06);
+}
+.ov-chip.s {
+  color: var(--sky);
+  border-color: rgba(76, 195, 255, 0.6);
+  background: rgba(76, 195, 255, 0.12);
+  box-shadow: 0 0 8px rgba(76, 195, 255, 0.25);
+}
+.ov-chip.a {
+  color: var(--amb);
+  border-color: rgba(251, 191, 36, 0.55);
+  background: rgba(251, 191, 36, 0.1);
+}
+.ov-step {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  border: 1px solid rgba(76, 195, 255, 0.4);
+  border-radius: 7px;
+  overflow: hidden;
+}
+.ov-step button {
+  min-height: 36px;
+  border: 0;
+  border-right: 1px solid rgba(76, 195, 255, 0.22);
+  background: transparent;
+  color: var(--tx2);
+  font: 700 13px/1 var(--mono);
+  cursor: pointer;
+}
+.ov-step button:last-child {
+  border-right: 0;
+}
+.ov-step button:hover:not([disabled]) {
+  background: rgba(76, 195, 255, 0.08);
+  color: #fff;
+}
+.ov-step button[aria-pressed="true"] {
+  background: linear-gradient(180deg, rgba(52, 211, 153, 0.32), rgba(52, 211, 153, 0.12));
+  color: #fff;
+  box-shadow: inset 0 -2px 0 var(--em), inset 0 0 10px rgba(52, 211, 153, 0.35);
+}
+.ov-step button[disabled] {
+  cursor: default;
+}
+.ov-step button:focus-visible {
+  outline: 2px solid var(--sky);
+  outline-offset: -2px;
+}
+.ov-ends {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--mute);
+}
+.ov-custom {
+  color: var(--amb);
+}
+.ov-note {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  color: var(--mute);
+}
+.ov-confirm {
+  margin-top: 8px;
+}
+.ov-msg {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--em);
+}
+.ov-msg.bad {
+  color: var(--red);
+}
+.ov-rules {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.ov-rules li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 2px 6px 12px;
+  position: relative;
+  font-size: 12.5px;
+  color: var(--tx2);
+  border-bottom: 1px solid rgba(76, 195, 255, 0.08);
+}
+.ov-rules li:last-child {
+  border-bottom: 0;
+}
+.ov-rules li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: calc(50% - 2.5px);
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--em);
+  box-shadow: 0 0 5px rgba(52, 211, 153, 0.6);
+}
+.ov-rules li.off {
+  color: var(--dim);
+}
+.ov-rules li.off::before {
+  background: var(--dim);
+  box-shadow: none;
+}
+.ov-rt {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.ov-tog {
+  flex: none;
+  position: relative;
+  width: 42px;
+  height: 24px;
+  border: 1px solid rgba(76, 195, 255, 0.5);
+  border-radius: 12px;
+  background: var(--deep);
+  cursor: pointer;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+.ov-tog::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--dim);
+  transition: transform 0.18s ease, background 0.18s ease;
+}
+.ov-tog[aria-checked="true"] {
+  background: rgba(76, 195, 255, 0.18);
+  border-color: var(--sky);
+  box-shadow: 0 0 8px rgba(76, 195, 255, 0.35);
+}
+.ov-tog[aria-checked="true"]::after {
+  transform: translateX(18px);
+  background: var(--sky);
+  box-shadow: 0 0 6px var(--glow);
+}
+.ov-tog[disabled] {
+  cursor: default;
+  opacity: 0.75;
+}
+.ov-tog:focus-visible {
+  outline: 2px solid var(--sky);
+  outline-offset: 2px;
+}
+@media (max-width: 640px) {
+  .ov-step button {
+    min-height: 42px;
+  }
+  .ov-tog {
+    width: 46px;
+    height: 28px;
+    border-radius: 14px;
+  }
+  .ov-tog::after {
+    width: 20px;
+    height: 20px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ov-tog,
+  .ov-tog::after {
+    transition: none;
+  }
+}
