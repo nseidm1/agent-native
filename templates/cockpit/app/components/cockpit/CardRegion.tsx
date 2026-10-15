@@ -1,5 +1,5 @@
 import { agentNativePath } from "@agent-native/core/client/api-path";
-import { useActionMutation, useActionQuery } from "@agent-native/core/client/hooks";
+import { useActionMutation, useActionQuery, useDbSync } from "@agent-native/core/client/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -12,6 +12,7 @@ import {
   DEFAULT_LAYOUT,
   type Tone,
 } from "@shared/cockpit";
+import { BoardDialog } from "./BoardDialog";
 import { CardDialog } from "./CardDialog";
 import { type AskImage, MAX_ASK_IMAGES, precheckImageFile, sniffImageType } from "@shared/ask-images";
 
@@ -339,9 +340,23 @@ function AskPanel({ onClose }: { onClose: () => void }) {
   );
 }
 
+/**
+ * Liveness (FA-19027): the server's cockpit client holds one change stream to
+ * the cockpit and records a "cockpit" change for every resource that moved
+ * (server/plugins/cockpit-live.ts); this page hears it on the framework's own
+ * sync transport and re-reads its queries. Nothing polls the cockpit's state;
+ * the query intervals below are only the fallback for a dropped stream, and a
+ * read the client already has costs a 304 at most.
+ */
+function CockpitSync() {
+  const queryClient = useQueryClient();
+  useDbSync({ queryClient, realtime: { reason: "the cockpit's cards and board change while the region is open" }, pauseWhenHidden: true });
+  return null;
+}
+
 export function CardRegion() {
-  const cardsQ = useActionQuery<CardsResult>("get-cards", {}, { refetchInterval: 3000 });
-  const layoutQ = useActionQuery<CockpitLayout>("get-layout", {}, { refetchInterval: 5000 });
+  const cardsQ = useActionQuery<CardsResult>("get-cards", {}, { refetchInterval: 15000 });
+  const layoutQ = useActionQuery<CockpitLayout>("get-layout", {}, { refetchInterval: 30000 });
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [askOpen, setAskOpen] = useState(false);
   const [openId, setOpenId] = useState<CardId | null>(null);
@@ -402,10 +417,11 @@ export function CardRegion() {
       ? { text: "connecting…", stale: false }
       : !result.ok
         ? { text: result.error || "cockpit unreachable", stale: true }
-        : { text: "live · " + new Date(result.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }), stale: false };
+        : { text: (result.live ? "live · " : "polling · ") + new Date(result.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }), stale: false };
 
   return (
     <div className="cp-region" ref={rootRef} data-testid="cockpit-region">
+      <CockpitSync />
       <header className="cp-head">
         <h1>Cards</h1>
         <span className={"cp-live" + (status.stale ? " stale" : "")} aria-live="polite">
@@ -479,7 +495,12 @@ export function CardRegion() {
         );
       })}
       <CardDialog
-        card={openId ? (byId.get(openId) ?? placeholder(openId)) : null}
+        card={openId && openId !== "board" ? (byId.get(openId) ?? placeholder(openId)) : null}
+        onClose={() => setOpenId(null)}
+        returnTo={openerRef.current}
+      />
+      <BoardDialog
+        card={openId === "board" ? (byId.get("board") ?? placeholder("board")) : null}
         onClose={() => setOpenId(null)}
         returnTo={openerRef.current}
       />

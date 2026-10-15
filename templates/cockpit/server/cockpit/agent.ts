@@ -2,9 +2,12 @@
  * The cockpit's agent is the Mac's own Claude Code CLI, already logged in
  * (console instruction: "use the current Mac client as the client"). One run
  * at a time, 120 s cap, argv array (never a shell string), and the run can
- * reach exactly four tools: this app's get-cards, get-card-detail (read),
- * get-layout and set-layout
- * over its own MCP endpoint. Built-in tools (shell, files, web) are disabled
+ * reach exactly these tools over its own MCP endpoint: this app's get-cards,
+ * get-card-detail, get-board, get-board-card, cockpit-manifest and
+ * cockpit-read (reads, all through the cockpit client: cockpit-read reaches
+ * any resource the cockpit's manifest names, so a new one needs no change
+ * here), get-layout and set-layout. It never writes to the cockpit:
+ * cockpit-act and the dialog writes are disallowed outright. Built-in tools (shell, files, web) are disabled
  * with --tools "", other MCP servers are excluded with --strict-mcp-config,
  * and anything not allow-listed is denied by --permission-mode dontAsk.
  *
@@ -36,7 +39,7 @@ import { type FiledRequest, fileRequestCard } from "./request-card.js";
 
 export const AGENT_TIMEOUT_MS = 120_000;
 export const MCP_SERVER_NAME = "cockpit";
-export const AGENT_TOOL_NAMES = ["get-cards", "get-card-detail", "get-layout", "set-layout"] as const;
+export const AGENT_TOOL_NAMES = ["get-cards", "get-card-detail", "get-board", "get-board-card", "cockpit-manifest", "cockpit-read", "get-layout", "set-layout"] as const;
 export const ALLOWED_TOOLS = AGENT_TOOL_NAMES.map((t) => `mcp__${MCP_SERVER_NAME}__${t}`);
 /**
  * The framework's own MCP tools on the same endpoint. --allowedTools plus
@@ -50,13 +53,15 @@ export const DISALLOWED_TOOLS = [
   "open_app",
   "create_embed_session",
   "tool-search",
-  // the dialog writes are never MCP tools (mcpTool: false); named here too, so the run is never offered one
+  // the dialog writes and the generic cockpit-act are never MCP tools (mcpTool: false); named here too, so the run is never offered one
+  "cockpit-act",
   ...WRITE_ACTION_NAMES,
 ].map(
   (t) => `mcp__${MCP_SERVER_NAME}__${t}`,
 );
 export const AGENT_SYSTEM_PROMPT =
-  "You manage the cockpit card region. Read a card's full detail with get-card-detail. Change layout only through set-layout. " +
+  "You manage the cockpit card region. Read a card's full detail with get-card-detail, the whole board with get-board and one board card with get-board-card; " +
+  "cockpit-manifest lists everything the cockpit offers and cockpit-read reads any of it. Change layout only through set-layout. " +
   "Read get-layout before changing it, send the whole layout back with only the requested change, and answer in one or two short sentences.";
 
 export const dataDir = () => path.resolve(process.env.COCKPIT_DATA_DIR || path.join(process.cwd(), "data", "cockpit-agent"));

@@ -18,7 +18,7 @@ import {
 } from "@shared/cockpit-detail";
 
 /** The cockpit (the parent window) gives the iframe the whole viewport while a dialog is open. */
-function postModal(open: boolean) {
+export function postModal(open: boolean) {
   try {
     window.parent.postMessage({ type: "cockpit-modal", open }, "*");
   } catch {
@@ -27,19 +27,19 @@ function postModal(open: boolean) {
 }
 
 /** Writes act on this Mac; a viewer reaching the region over the tailnet sees them disabled (the server refuses them too). */
-function isLocalViewer(): boolean {
+export function isLocalViewer(): boolean {
   if (typeof window === "undefined") return false;
   const h = window.location.hostname.replace(/^\[|\]$/g, "");
   return h === "127.0.0.1" || h === "localhost" || h === "::1";
 }
 
-const READ_ONLY = "read-only on this device";
+export const READ_ONLY = "read-only on this device";
 
 function cellOf(c: DetailCell): { t: string; tone?: Tone; mono?: boolean; title?: string } {
   return typeof c === "string" ? { t: c } : c;
 }
 
-function ActionButton({ action, canWrite, onDone }: { action: DetailAction; canWrite: boolean; onDone: () => void }) {
+export function ActionButton({ action, canWrite, onDone }: { action: DetailAction; canWrite: boolean; onDone: () => void }) {
   const [asking, setAsking] = useState(false);
   const [value, setValue] = useState("");
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -328,7 +328,7 @@ function JobStart({ form, canWrite, onDone }: { form: JobForm; canWrite: boolean
 }
 
 /** The dialog's search field (the Board dialog: cards and sub-cards by FA id or title). */
-function SearchField({ search, value, onChange, matches }: { search: DetailSearch; value: string; onChange: (v: string) => void; matches: number }) {
+export function SearchField({ search, value, onChange, matches }: { search: DetailSearch; value: string; onChange: (v: string) => void; matches: number }) {
   return (
     <div className="cp-search" role="search">
       <svg className="cp-search-i" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
@@ -369,7 +369,8 @@ function DetailBody({ id, canWrite }: { id: CardId; canWrite: boolean }) {
   const [server, setServer] = useState<Record<string, string>>({});
   const [local, setLocal] = useState<Record<string, string>>({});
   const [query, setQuery] = useState("");
-  const q = useActionQuery<CardDetail>("get-card-detail", { id, ...server } as any, { refetchInterval: 5000 });
+  // fresh on the cockpit client's change stream (useDbSync in CardRegion); the interval is only the fallback
+  const q = useActionQuery<CardDetail>("get-card-detail", { id, ...server } as any, { refetchInterval: 15000 });
   const d = q.data;
   const refresh = () => {
     void qc.invalidateQueries();
@@ -417,7 +418,7 @@ function DetailBody({ id, canWrite }: { id: CardId; canWrite: boolean }) {
   );
 }
 
-const GLYPH: Record<Tone, string> = { g: "✓", a: "⚠", r: "✕", d: "–" };
+export const GLYPH: Record<Tone, string> = { g: "✓", a: "⚠", r: "✕", d: "–" };
 
 export function CardDialog({ card, onClose, returnTo }: { card: CockpitCard | null; onClose: () => void; returnTo: HTMLElement | null }) {
   const open = !!card;

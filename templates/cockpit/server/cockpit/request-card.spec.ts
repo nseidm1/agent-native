@@ -97,7 +97,7 @@ ${opts.files ? 'writeFileSync(b.replace(/\\.json$/, "") + ".ids.json", JSON.stri
     const root = fakeRepo({ files: true });
     process.env.COCKPIT_PORTFOLIO_DIR = root;
     process.env.COCKPIT_DATA_DIR = path.join(root, "data");
-    process.env.COCKPIT_BOARD_URL = "http://127.0.0.1:9"; // nothing listens: the folder fallback
+    process.env.COCKPIT_CLIENT_URL = "http://127.0.0.1:9/unreachable"; // nothing listens: the folder fallback
     process.env.PORT = "5241"; // as the live server runs
     try {
       const r = await fileRequestCard("Add a search; rm -rf / $(whoami)", { kind: "change", title: "Search", area: "dialog", ok: true }, [
@@ -118,7 +118,7 @@ ${opts.files ? 'writeFileSync(b.replace(/\\.json$/, "") + ".ids.json", JSON.stri
     } finally {
       delete process.env.COCKPIT_PORTFOLIO_DIR;
       delete process.env.COCKPIT_DATA_DIR;
-      delete process.env.COCKPIT_BOARD_URL;
+      delete process.env.COCKPIT_CLIENT_URL;
       delete process.env.PORT;
     }
   });

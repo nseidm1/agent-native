@@ -63,6 +63,8 @@ export interface CardsResult {
   at: number;
   ok: boolean;
   error?: string;
+  /** true while the cockpit client's change stream is connected (the page refreshes on its events) */
+  live?: boolean;
   cards: CockpitCard[];
 }
 

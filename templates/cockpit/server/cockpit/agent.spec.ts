@@ -18,10 +18,19 @@ describe("ask-agent bounds", () => {
     }
   });
 
-  it("allows exactly the four cockpit MCP tools (one read added), never a write, and disables every built-in tool", () => {
-    expect(ALLOWED_TOOLS).toEqual(["mcp__cockpit__get-cards", "mcp__cockpit__get-card-detail", "mcp__cockpit__get-layout", "mcp__cockpit__set-layout"]);
+  it("allows exactly the cockpit's read tools and set-layout, never a write, and disables every built-in tool", () => {
+    expect(ALLOWED_TOOLS).toEqual([
+      "mcp__cockpit__get-cards",
+      "mcp__cockpit__get-card-detail",
+      "mcp__cockpit__get-board",
+      "mcp__cockpit__get-board-card",
+      "mcp__cockpit__cockpit-manifest",
+      "mcp__cockpit__cockpit-read",
+      "mcp__cockpit__get-layout",
+      "mcp__cockpit__set-layout",
+    ]);
     const args = buildArgs("--dangerously-skip-permissions", "/x/mcp.json");
-    for (const w of ["cockpit-board-card-action", "cockpit-halo-model", "cockpit-job-start"]) {
+    for (const w of ["cockpit-act", "cockpit-board-card-action", "cockpit-halo-model", "cockpit-job-start"]) {
       expect(args[args.indexOf("--disallowedTools") + 1]).toContain("mcp__cockpit__" + w);
     }
     expect(args[args.indexOf("--tools") + 1]).toBe("");

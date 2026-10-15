@@ -4,7 +4,7 @@ import { WRITE_ACTION_NAMES } from "../../shared/cockpit-detail.js";
 import { isLoopbackAddress } from "../cockpit/agent.js";
 
 /** The actions that act on this Mac: ask-agent spawns the local CLI, the cockpit-* writes change the cockpit. */
-export const LOOPBACK_ONLY_ACTIONS = ["ask-agent", ...WRITE_ACTION_NAMES];
+export const LOOPBACK_ONLY_ACTIONS = ["ask-agent", "cockpit-act", ...WRITE_ACTION_NAMES];
 const ROUTE = new RegExp(`/_agent-native/actions/(${LOOPBACK_ONLY_ACTIONS.join("|")})/?$`);
 
 /**

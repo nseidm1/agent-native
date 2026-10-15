@@ -133,7 +133,7 @@ describe("card detail", () => {
 
   // the live cockpit's state, when a copy is on hand (COCKPIT_STATE_FILE): every dialog builds, inside the bounds
   const file = process.env.COCKPIT_STATE_FILE;
-  it.runIf(!!file && existsSync(file))("builds every dialog from a real /api/state, inside the bounds", () => {
+  it.runIf(!!file && existsSync(file))("builds every dialog from a real cockpit state, inside the bounds", () => {
     const j = JSON.parse(readFileSync(file as string, "utf8"));
     for (const id of CARD_IDS) {
       const d = buildDetail(id, j);

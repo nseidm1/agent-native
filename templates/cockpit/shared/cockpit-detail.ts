@@ -1,7 +1,7 @@
 /**
  * The detail model behind a card's click window: what get-card-detail returns
- * and the dialog renders. Built server-side from the cockpit's full state, so
- * the client stays a generic renderer. Bounded: at most DETAIL_MAX_ROWS rows
+ * and the dialog renders. Built server-side from the cockpit client's
+ * resources (server/cockpit/client.ts), so the page stays a generic renderer. Bounded: at most DETAIL_MAX_ROWS rows
  * per table or list and DETAIL_MAX_CHARS characters per string.
  */
 import type { CardId, Tone } from "./cockpit.js";
@@ -10,8 +10,37 @@ export const DETAIL_MAX_ROWS = 200;
 export const DETAIL_MAX_CHARS = 300;
 
 /**
- * The writes a dialog can offer. Each is its own POST action that forwards to
- * the cockpit (127.0.0.1:5217) and answers loopback callers only.
+ * The cockpit actions (manifest names) each dialog write runs through the
+ * client; orphan and release are families (orphans.land / .discard / .hand,
+ * release.now / .auto). Checked against the manifest by
+ * server/cockpit/manifest-parity.spec.ts.
+ */
+export const COCKPIT_ACTIONS = {
+  "job-start": "jobs.start",
+  "job-stop": "jobs.stop",
+  orphan: "orphans",
+  release: "release",
+  "funnel-on": "appkpis.funnelOn",
+  "board-card": "board.cardAction",
+  "halo-model": "halo.setModel",
+} as const;
+/** Every manifest action name a dialog can run. */
+export const COCKPIT_ACTION_NAMES_USED = [
+  "jobs.start",
+  "jobs.stop",
+  "orphans.land",
+  "orphans.discard",
+  "orphans.hand",
+  "release.now",
+  "release.auto",
+  "appkpis.funnelOn",
+  "board.cardAction",
+  "halo.setModel",
+] as const;
+
+/**
+ * The writes a dialog can offer. Each is its own POST action that runs the
+ * cockpit action above through the client and answers loopback callers only.
  */
 export const WRITE_ACTIONS = {
   "job-start": "cockpit-job-start",

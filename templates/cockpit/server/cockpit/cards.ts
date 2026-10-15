@@ -1,6 +1,6 @@
 /**
- * Maps the cockpit's FULL /api/state (about 1.2 MB) to the compact card model
- * (a few KB). The words follow the cockpit's own tile renderers, headers(j)
+ * Maps the cockpit's state (assembled from the client's bounded resources by
+ * state.ts) to the compact card model (a few KB). The words follow the cockpit's own tile renderers, headers(j)
  * and tileArt(j) in tools/lane/maint/ui/index.html, so a card here says what
  * the tile it replaces said. Each card is built on its own: a missing or odd
  * field gives that card tone 'd' and "no data", never a throw.
@@ -14,6 +14,8 @@ import {
   type CockpitCard,
   type Tone,
 } from "../../shared/cockpit.js";
+import { streamConnected } from "./client.js";
+import { getState } from "./state.js";
 
 // The state is untyped JSON from another process; read it defensively.
 type J = any;
@@ -337,45 +339,6 @@ export function mapState(j: J, now = Date.now()): CockpitCard[] {
   });
 }
 
-export const COCKPIT_STATE_URL = process.env.COCKPIT_STATE_URL || "http://127.0.0.1:5217/api/state";
-const CACHE_MS = 3000;
-
-export interface StateRead {
-  at: number;
-  ok: boolean;
-  error?: string;
-  /** The last good full state (kept while the cockpit is unreachable), or null before the first read. */
-  j: J | null;
-}
-
-let stateCache: { at: number; read: StateRead } | null = null;
-let stateInflight: Promise<StateRead> | null = null;
-let lastGood: { at: number; j: J } | null = null;
-
-/** The cockpit's full state (8 s timeout), cached 3 s in-process; one fetch at a time. Shared by get-cards and get-card-detail. */
-export async function getState(): Promise<StateRead> {
-  if (stateCache && Date.now() - stateCache.at < CACHE_MS) return stateCache.read;
-  if (stateInflight) return stateInflight;
-  stateInflight = (async () => {
-    try {
-      const res = await fetch(COCKPIT_STATE_URL, { signal: AbortSignal.timeout(8000) });
-      if (!res.ok) throw new Error("cockpit answered HTTP " + res.status);
-      const j = await res.json();
-      lastGood = { at: Date.now(), j };
-      const read: StateRead = { at: lastGood.at, ok: true, j };
-      stateCache = { at: Date.now(), read };
-      return read;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      // keep the last good state, marked stale, rather than blanking the region
-      return { at: lastGood ? lastGood.at : Date.now(), ok: false, error: "cockpit unreachable: " + msg, j: lastGood ? lastGood.j : null };
-    } finally {
-      stateInflight = null;
-    }
-  })();
-  return stateInflight;
-}
-
 let cardsCache: { j: J; result: CardsResult } | null = null;
 
 /** The 14 compact cards from the shared state read; mapped once per state object. */
@@ -383,7 +346,8 @@ export async function getCards(): Promise<CardsResult> {
   const r = await getState();
   if (!r.j) return { at: r.at, ok: false, error: r.error, cards: CARD_IDS.map(noDataCard) };
   if (!cardsCache || cardsCache.j !== r.j) cardsCache = { j: r.j, result: { at: r.at, ok: true, cards: mapState(r.j) } };
-  return r.ok ? cardsCache.result : { ...cardsCache.result, ok: false, error: r.error };
+  const live = streamConnected();
+  return r.ok ? { ...cardsCache.result, live } : { ...cardsCache.result, live, ok: false, error: r.error };
 }
 
 /** One card's face (tone, headline, sub, chip) from a state object; the dialog header repeats it. */

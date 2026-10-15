@@ -1,5 +1,6 @@
 /**
- * A card's click window, built from the cockpit's FULL /api/state. The words
+ * A card's click window, built from the cockpit's state (state.ts assembles it
+ * from the cockpit client's resources). The words
  * and sections follow the cockpit's own dialog renderers in
  * tools/lane/maint/ui/index.html and page/*.js (scoreView, dmCard/DM_ROWS,
  * jobs, forge, the work-state ledger, pipeline, production releases, KPIs,
@@ -33,11 +34,11 @@ export interface DetailOptions {
   /** modes: the work class (all | hot | system | production) and the window (today | 7d | all). */
   cls?: string;
   window?: string;
-  /** halo: GET /api/halo/models, fetched by the caller (null when unreachable). */
+  /** halo: the client resource halomodels, read by the caller (null when unreachable). */
   haloModels?: J[] | null;
-  /** appkpis: GET /api/env/_data, fetched by the caller (null when unreachable). */
+  /** appkpis: the client resource appdata, read by the caller (null when unreachable). */
   appData?: J | null;
-  /** score: GET /api/studio/estimate/panel (the spend tally's baseline and the estimate details), or null. */
+  /** score: the client resource estimate (the spend tally's baseline and the estimate details), or null. */
   costPanel?: J | null;
 }
 
@@ -809,7 +810,7 @@ function halo(j: J, o: DetailOptions, now: number): Body {
       stats("Vitals", vit),
       table("Models: memory, state, live load, on and off", ["Model", "Kind", "State", "Memory", "Load"], modelRows, {
         sub: mb ? mb.gb + " GB free · " + str(mb.sub || "") : undefined,
-        empty: reg === null ? "The model list (GET /api/halo/models) did not answer." : "No models.",
+        empty: reg === null ? "The model list (the cockpit's halomodels) did not answer." : "No models.",
       }),
       table("What runs on each model", ["Model", "Where", "Jobs"], jobsRows, { collapsed: true }),
     ],

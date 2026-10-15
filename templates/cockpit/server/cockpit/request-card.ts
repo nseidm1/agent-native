@@ -9,10 +9,10 @@
  * tools/lane/file-card.mjs <batch.json>, run from the repo root with an argv
  * array (never a shell string). The request is quoted verbatim in the note,
  * except that the filer's runner skip words and backticks are swapped for
- * plain words (the filer refuses them). Attached images go onto the card
- * through the board's own /api/attach (loopback); if the board cannot take
- * them they are saved under .tmp/lane/maint/run/ask-attachments/<FA>/ and the
- * paths are added to the card's note.
+ * plain words (the filer refuses them). Attached images are saved under
+ * .tmp/lane/maint/run/ask-attachments/<FA>/ and put on the card through the
+ * cockpit client's board.attach action (FA-19027: no raw board route here);
+ * if that cannot take them, the saved paths are added to the card's note.
  */
 import { execFile } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -22,16 +22,18 @@ import path from "node:path";
 
 import type { AskImageType } from "../../shared/ask-images.js";
 import { AgentError, dataDir, firstLine } from "./agent.js";
+import { act, ClientError } from "./client.js";
 import { CHANGE_AREAS, type Classification, cleanTitle } from "./classify.js";
 
 export const FILE_CARD_TIMEOUT_MS = 120_000;
 export const REQUEST_NOTE_MAX = 2000;
 export const PARENT_CARD = "FA-18951";
+const ATTACH_TRIES = 6;
+const ATTACH_RETRY_MS = 2500;
 /** The prefix every request card's title carries (the filer caps titles at 56). */
 export const TITLE_PREFIX = "Cockpit region: ";
 
 export const portfolioDir = () => path.resolve(process.env.COCKPIT_PORTFOLIO_DIR || path.join(process.cwd(), "..", "..", "..", ".."));
-const boardUrl = () => (process.env.COCKPIT_BOARD_URL || "http://127.0.0.1:5199").replace(/\/$/, "");
 
 /** The filer's skip words (tools/lane/file-card-check.mjs SKIP_SWAPS), swapped for the same plain words it suggests. */
 const SKIP_SWAPS: [RegExp, string][] = [
@@ -125,21 +127,6 @@ function run(file: string, args: string[], cwd: string, timeout: number): Promis
   });
 }
 
-/** The board's card id (a title slug) for an FA number, read from the board's own state file. */
-async function boardIdOf(root: string, fa: string): Promise<string | null> {
-  for (let i = 0; i < 6; i++) {
-    try {
-      const st = JSON.parse(await readFile(path.join(root, "tools", "board", "board.json"), "utf8"));
-      const hit = Object.entries((st && st.tickets) || {}).find(([, v]) => v === fa);
-      if (hit) return hit[0];
-    } catch {
-      // the board rewrites the file; read again
-    }
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  return null;
-}
-
 export interface DecodedImage {
   bytes: Buffer;
   ext: string;
@@ -217,26 +204,7 @@ export async function fileRequestCard(question: string, cls: Classification, ima
   if (!images.length) return { fa, title: card.title, attached: "none", images: [], again };
 
   const names = images.map((im, i) => `ask-request-${i + 1}.${im.ext}`);
-  // on the card itself, through the board's loopback attach route
-  const id = await boardIdOf(root, fa);
-  if (id) {
-    let ok = 0;
-    for (let i = 0; i < images.length; i++) {
-      try {
-        const res = await fetch(boardUrl() + "/api/attach", {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify({ id, name: names[i], dataUrl: `data:${images[i].type};base64,${images[i].bytes.toString("base64")}` }),
-          signal: AbortSignal.timeout(15_000),
-        });
-        if (res.ok) ok++;
-      } catch {
-        // falls through to the folder
-      }
-    }
-    if (ok === images.length) return { fa, title: card.title, attached: "board", images: names, again };
-  }
-  // the board could not take them: saved beside the lane state, and the card's note names the paths
+  // saved beside the lane state first: the cockpit's board.attach reads the image from there (the bytes never ride an action body)
   const folder = path.join(root, ".tmp", "lane", "maint", "run", "ask-attachments", fa);
   await mkdir(folder, { recursive: true });
   const paths: string[] = [];
@@ -245,6 +213,23 @@ export async function fileRequestCard(question: string, cls: Classification, ima
     await writeFile(p, images[i].bytes);
     paths.push(path.relative(root, p));
   }
+  // on the card itself; a card filed a moment ago reaches the cockpit's board read within seconds, so "not an open card" is retried
+  let ok = 0;
+  for (const name of names) {
+    for (let tryN = 0; tryN < ATTACH_TRIES; tryN++) {
+      try {
+        await act("board.attach", { fa, name });
+        ok++;
+        break;
+      } catch (e) {
+        const notYet = e instanceof ClientError && e.status === 404 && /not an open card/.test(e.message);
+        if (!notYet || tryN === ATTACH_TRIES - 1) break;
+        await new Promise((r) => setTimeout(r, ATTACH_RETRY_MS));
+      }
+    }
+  }
+  if (ok === images.length) return { fa, title: card.title, attached: "board", images: names, again };
+  // the board could not take them: the card's note names the saved paths
   await run(process.execPath, [path.join(root, "tools", "board", "cli.mjs"), "note", fa, "IMAGES attached to the request: " + paths.join(", ")], root, 30_000);
   return { fa, title: card.title, attached: "folder", images: paths, again };
 }

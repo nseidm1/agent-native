@@ -1,0 +1,369 @@
+{
+ "version": "1",
+ "resources": [
+  {
+   "name": "status",
+   "description": "Lane status: driver, lander, engine, capacity, switches, locks, strictness and the queue (the status strip and Lane control)."
+  },
+  {
+   "name": "score",
+   "description": "The scorecard: landed, per hour, cost per landed card, flow and spend; the newest per-card rows."
+  },
+  {
+   "name": "modes",
+   "description": "Drafting modes: the scorecard by mode (today, all, by model, last 10) and the drafting-mode comparison windows."
+  },
+  {
+   "name": "jobs",
+   "description": "Agent jobs: kinds, schedules, live and finished runs, asks and queues, today's count and spend."
+  },
+  {
+   "name": "agents",
+   "description": "Live agents and the roster counts (who is working, on what, at what cost)."
+  },
+  {
+   "name": "forge",
+   "description": "The forge: how much of what it found it fixed by itself today, what it is fixing, and its findings."
+  },
+  {
+   "name": "features",
+   "description": "Feature requests: building, queued, waiting, open, failed and landed today, and the open questions."
+  },
+  {
+   "name": "orphans",
+   "description": "Orphaned work: counts, the ledger invariant, and the items a console can land, discard or hand (orphans.* actions)."
+  },
+  {
+   "name": "pipeline",
+   "description": "The work pipeline: the lane's cards by stage, counts, the system and production lanes, stranded cards and the release alert."
+  },
+  {
+   "name": "production",
+   "description": "Production releases per app (state, how far ahead, the next action) and per-app readiness."
+  },
+  {
+   "name": "appkpis",
+   "description": "App KPIs: one row per studio app and the summary (alerts, off target, launch)."
+  },
+  {
+   "name": "syskpis",
+   "description": "System KPIs: the forge KPI registry grouped by area and its summary."
+  },
+  {
+   "name": "board",
+   "description": "The board's frame: columns, counts per column, the apps filter, when it was read (the cards are board/cards)."
+  },
+  {
+   "name": "models",
+   "description": "Model use: spend by model, calibration, the drafting waterfall, escalations and the mid-tier rows."
+  },
+  {
+   "name": "halo",
+   "description": "The Halo: model jobs, servers, machine vitals, memory budget, generation and lane use."
+  },
+  {
+   "name": "halocaps",
+   "description": "Halo capabilities: what the Halo does for agents per model and infra piece, each with its measured status."
+  },
+  {
+   "name": "halosave",
+   "description": "Halo savings: the headline, net, live and shadow savings, bars per day and the newest uses."
+  },
+  {
+   "name": "balancer",
+   "description": "The Balancer: the share of Claude spend saved today, by executor and by who, and the daily bars."
+  },
+  {
+   "name": "hygiene",
+   "description": "Board hygiene: relevance, refusals, landed-not-released, awaiting release, ready work refused, stale reviews."
+  },
+  {
+   "name": "events",
+   "description": "The event feed: the newest lane events (time, source, type, class, text and their product words)."
+  },
+  {
+   "name": "office",
+   "description": "The office: who is at which desk, the queue, the Halo row and today's landed and failed counts."
+  },
+  {
+   "name": "board/cards",
+   "description": "Every open card on the board (archived excluded): id, FA, title, column, priority, estimate, parent, children, links, paused, triaged, chips, app and lane stage."
+  },
+  {
+   "name": "board/card/{fa}",
+   "description": "One open card with everything board/cards carries plus its body, its notes (the newest 16000 characters) and its open questions."
+  },
+  {
+   "name": "halomodels",
+   "description": "The Halo model list: each model's id, name, kind, size, whether it is on, its state and memory, what uses it and why it is waiting (halo.setModel turns one on or off)."
+  },
+  {
+   "name": "appdata",
+   "description": "Production app data: the collector, the publish to the app-data ref, the public Funnel (on or off, its endpoint) and the plain-words state (appkpis.funnelOn turns the Funnel on)."
+  },
+  {
+   "name": "estimate",
+   "description": "The estimate panel: the spend baseline, savings by lever and the ratios the scorecard window shows."
+  }
+ ],
+ "actions": [
+  {
+   "name": "ping",
+   "write": false,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "text"
+    ],
+    "properties": {
+     "text": {
+      "type": "string",
+      "maxLength": 200
+     }
+    }
+   }
+  },
+  {
+   "name": "jobs.start",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "kind",
+     "text"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "maxLength": 60
+     },
+     "text": {
+      "type": "string",
+      "maxLength": 4000
+     },
+     "maxUsd": {
+      "type": "number",
+      "maximum": 1000
+     },
+     "maxMin": {
+      "type": "number",
+      "maximum": 1440
+     }
+    }
+   }
+  },
+  {
+   "name": "jobs.stop",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "name"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 80
+     },
+     "id": {
+      "type": "string",
+      "maxLength": 80
+     }
+    }
+   }
+  },
+  {
+   "name": "orphans.land",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "id"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "maxLength": 80
+     },
+     "reason": {
+      "type": "string",
+      "maxLength": 500
+     },
+     "agent": {
+      "type": "string",
+      "maxLength": 60
+     }
+    }
+   }
+  },
+  {
+   "name": "orphans.discard",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "id",
+     "reason"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "maxLength": 80
+     },
+     "reason": {
+      "type": "string",
+      "maxLength": 500
+     },
+     "agent": {
+      "type": "string",
+      "maxLength": 60
+     }
+    }
+   }
+  },
+  {
+   "name": "orphans.hand",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "id",
+     "agent"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "maxLength": 80
+     },
+     "reason": {
+      "type": "string",
+      "maxLength": 500
+     },
+     "agent": {
+      "type": "string",
+      "maxLength": 60
+     }
+    }
+   }
+  },
+  {
+   "name": "release.now",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [],
+    "properties": {}
+   }
+  },
+  {
+   "name": "release.auto",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "auto"
+    ],
+    "properties": {
+     "auto": {
+      "type": "boolean"
+     }
+    }
+   }
+  },
+  {
+   "name": "appkpis.funnelOn",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "confirm"
+    ],
+    "properties": {
+     "confirm": {
+      "type": "boolean"
+     }
+    }
+   }
+  },
+  {
+   "name": "board.cardAction",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "fa",
+     "action"
+    ],
+    "properties": {
+     "fa": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "action": {
+      "type": "string",
+      "enum": [
+       "pause",
+       "resume",
+       "backlog",
+       "promote",
+       "archive"
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "halo.setModel",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "id",
+     "enabled"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "maxLength": 80
+     },
+     "enabled": {
+      "type": "boolean"
+     }
+    }
+   }
+  },
+  {
+   "name": "board.attach",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "fa",
+     "name"
+    ],
+    "properties": {
+     "fa": {
+      "type": "string",
+      "maxLength": 12
+     },
+     "name": {
+      "type": "string",
+      "maxLength": 80
+     }
+    }
+   }
+  }
+ ]
+}
