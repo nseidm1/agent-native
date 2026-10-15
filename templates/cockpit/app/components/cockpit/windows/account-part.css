@@ -1,0 +1,210 @@
+/* FA-19125: the Claude account window's flow (AccountPart), in the neon theme. */
+.cf-ac {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cf-ac-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.cf-ac-row.end {
+  justify-content: flex-end;
+}
+.cf-ac-row .cp-in {
+  flex: 1 1 200px;
+  height: 30px;
+}
+.cf-ac-sub {
+  flex: 1 1 100%;
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--tx2);
+  overflow-wrap: anywhere;
+}
+.cf-ac-row.end .cf-ac-sub {
+  flex: 1 1 220px;
+}
+.cp-btn.cf-ac-prim {
+  border-color: var(--sky);
+  color: #fff;
+  background: linear-gradient(180deg, rgba(76, 195, 255, 0.32), rgba(76, 195, 255, 0.1));
+}
+.cf-ac-other,
+.cf-ac-paste {
+  flex: 1 1 100%;
+  font-size: 12px;
+  color: var(--tx2);
+}
+.cf-ac-other summary,
+.cf-ac-paste summary {
+  cursor: pointer;
+  padding: 4px 0;
+  color: var(--sky);
+}
+.cf-ac-other .cf-ac-row {
+  margin-top: 6px;
+}
+.cf-ac-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.cf-ac-step {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 2px 8px;
+  align-items: start;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--inner);
+}
+.cf-ac-step .ic {
+  font-size: 13px;
+  line-height: 18px;
+  text-align: center;
+  color: var(--mute);
+}
+.cf-ac-step .lb {
+  font-weight: 700;
+  font-size: 13px;
+  line-height: 18px;
+  color: var(--tx);
+}
+.cf-ac-step .rs {
+  grid-column: 2;
+  font-size: 12px;
+  color: var(--tx2);
+  overflow-wrap: anywhere;
+}
+.cf-ac-step.done .ic {
+  color: var(--em);
+}
+.cf-ac-step.failed {
+  border-color: rgba(248, 113, 113, 0.5);
+}
+.cf-ac-step.failed .ic,
+.cf-ac-step.failed .rs {
+  color: var(--red);
+}
+.cf-ac-step.working,
+.cf-ac-step.waiting {
+  border-color: var(--sky);
+  box-shadow: 0 0 10px rgba(76, 195, 255, 0.18);
+}
+.cf-ac-step.working .ic,
+.cf-ac-step.waiting .ic {
+  color: var(--sky);
+}
+.cf-ac-step.pending,
+.cf-ac-step.skipped {
+  opacity: 0.6;
+}
+.cf-ac-act {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+  align-items: center;
+}
+a.cf-ac-link {
+  text-decoration: none;
+  max-width: 100%;
+  height: auto;
+  min-height: 28px;
+  white-space: normal;
+  text-align: center;
+}
+.cf-ac-g {
+  display: inline-grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #fff;
+  color: #1a73e8;
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0;
+}
+.cf-ac-hint {
+  flex: 1 1 100%;
+  font-size: 12px;
+  color: var(--tx2);
+}
+.cf-ac-hint.why {
+  color: var(--amb);
+}
+.cf-ac-wait {
+  flex: 1 1 100%;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sky);
+}
+.cf-ac-wait::before {
+  content: "";
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: var(--sky);
+  box-shadow: 0 0 8px var(--glow);
+  animation: cf-ac-pulse 1.4s ease-in-out infinite;
+}
+@keyframes cf-ac-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cf-ac-wait::before {
+    animation: none;
+  }
+}
+.cf-ac-code {
+  display: flex;
+  flex: 1 1 100%;
+  gap: 8px;
+  align-items: center;
+}
+.cf-ac-code .cp-in {
+  flex: 1 1 auto;
+  height: 30px;
+  font-family: var(--mono);
+}
+.cf-ac-ask {
+  align-self: stretch;
+}
+.cf-ac-stat {
+  margin: 0;
+  min-height: 0;
+  font-size: 12px;
+  color: var(--tx2);
+}
+.cf-ac-stat:empty {
+  display: none;
+}
+.cf-ac-stat.bad {
+  color: var(--red);
+}
+@media (max-width: 759px), (pointer: coarse) {
+  .cf-ac .cp-btn,
+  .cf-ac .cp-in {
+    min-height: 44px;
+  }
+}
+/* the flow sits after the readings, as in the legacy dialog (who, Halo, budget, what it changes, then the buttons) */
+.cf-ac {
+  order: 1;
+}
+.cf-win[data-window="account"] .cp-dlg-b > .cp-at {
+  order: 2;
+}

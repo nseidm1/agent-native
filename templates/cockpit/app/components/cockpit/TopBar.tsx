@@ -26,6 +26,12 @@ export function TopBar({ h, onOpen, glance, onGlance }: { h: HeaderView; onOpen:
   const [menu, setMenu] = useState(false);
   const [seen, setSeen] = useState(0);
   useEffect(() => setSeen(readSeen()), [h.master]);
+  // FA-19126: the Message master window marks the replies seen while it is open (cf-msgseen); the count clears at once
+  useEffect(() => {
+    const f = () => setSeen(readSeen());
+    window.addEventListener("cf-msgseen", f);
+    return () => window.removeEventListener("cf-msgseen", f);
+  }, []);
   const unread = h.master ? h.master.replyAts.filter((t) => t > seen).length : 0;
   const upd = h.at ? new Date(h.at).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false }) : "";
   return (
