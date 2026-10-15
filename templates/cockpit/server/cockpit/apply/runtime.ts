@@ -17,6 +17,7 @@
  */
 import { spawn } from "node:child_process";
 import { openSync } from "node:fs";
+import net from "node:net";
 import path from "node:path";
 
 import { dataDir } from "../agent.js";
@@ -88,11 +89,27 @@ async function resourceContext() {
 }
 
 /** The gate script lives in the LIVE checkout (scripts/ is outside the agent's scope), served build in the worktree. */
+/** A port nothing listens on right now (a fixed one met a gate server left over from an earlier job). */
+function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const srv = net.createServer();
+    srv.unref();
+    srv.on("error", reject);
+    srv.listen(0, "127.0.0.1", () => {
+      const a = srv.address();
+      const port = a && typeof a === "object" ? a.port : 0;
+      srv.close(() => (port ? resolve(port) : reject(new Error("no free port"))));
+    });
+  });
+}
+
 function screenshotGate(P: ApplyPaths) {
   return async ({ appDir, outDir }: { appDir: string; outDir: string }) => {
-    const port = P.gatePort;
+    const port = await freePort().catch(() => P.gatePort);
     const log = openSync(path.join(P.jobsDir, "gate-server.out"), "a");
+    // its own process group, so the whole server (and anything it starts) is killed with it
     const server = spawn(P.node, [path.join(appDir, ".output", "server", "index.mjs")], {
+      detached: true,
       cwd: appDir,
       env: childEnv({ PORT: String(port), HOST: "127.0.0.1", APP_BASE_PATH: "/cards", AUTH_DISABLED: "true", DO_NOT_TRACK: "1", AGENT_NATIVE_TELEMETRY_DISABLED: "1", COCKPIT_DATA_DIR: path.join(appDir, "data", "cockpit-agent") }),
       stdio: ["ignore", log, log],
@@ -108,7 +125,11 @@ function screenshotGate(P: ApplyPaths) {
         return { ok: false, detail: (r.err || r.out).slice(-600), shots: [] };
       }
     } finally {
-      server.kill("SIGKILL");
+      try {
+        if (server.pid) process.kill(-server.pid, "SIGKILL");
+      } catch {
+        server.kill("SIGKILL");
+      }
     }
   };
 }
