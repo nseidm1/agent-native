@@ -2,7 +2,8 @@
  * The cockpit's agent is the Mac's own Claude Code CLI, already logged in
  * (console instruction: "use the current Mac client as the client"). One run
  * at a time, 120 s cap, argv array (never a shell string), and the run can
- * reach exactly three tools: this app's get-cards, get-layout and set-layout
+ * reach exactly four tools: this app's get-cards, get-card-detail (read),
+ * get-layout and set-layout
  * over its own MCP endpoint. Built-in tools (shell, files, web) are disabled
  * with --tools "", other MCP servers are excluded with --strict-mcp-config,
  * and anything not allow-listed is denied by --permission-mode dontAsk.
@@ -27,22 +28,32 @@ import {
   MAX_ASK_IMAGES,
   sniffImageType,
 } from "../../shared/ask-images.js";
+import { WRITE_ACTION_NAMES } from "../../shared/cockpit-detail.js";
 import { readLayout } from "./layout.js";
 
 export const AGENT_TIMEOUT_MS = 120_000;
 export const MCP_SERVER_NAME = "cockpit";
-export const AGENT_TOOL_NAMES = ["get-cards", "get-layout", "set-layout"] as const;
+export const AGENT_TOOL_NAMES = ["get-cards", "get-card-detail", "get-layout", "set-layout"] as const;
 export const ALLOWED_TOOLS = AGENT_TOOL_NAMES.map((t) => `mcp__${MCP_SERVER_NAME}__${t}`);
 /**
  * The framework's own MCP tools on the same endpoint. --allowedTools plus
  * dontAsk already denies them; --disallowedTools removes them from the run
  * outright, so the model is not even offered them.
  */
-export const DISALLOWED_TOOLS = ["ask_app", "ask_app_status", "list_apps", "open_app", "create_embed_session", "tool-search"].map(
+export const DISALLOWED_TOOLS = [
+  "ask_app",
+  "ask_app_status",
+  "list_apps",
+  "open_app",
+  "create_embed_session",
+  "tool-search",
+  // the dialog writes are never MCP tools (mcpTool: false); named here too, so the run is never offered one
+  ...WRITE_ACTION_NAMES,
+].map(
   (t) => `mcp__${MCP_SERVER_NAME}__${t}`,
 );
 export const AGENT_SYSTEM_PROMPT =
-  "You manage the cockpit card region. Change layout only through set-layout. " +
+  "You manage the cockpit card region. Read a card's full detail with get-card-detail. Change layout only through set-layout. " +
   "Read get-layout before changing it, send the whole layout back with only the requested change, and answer in one or two short sentences.";
 
 const dataDir = () => path.resolve(process.env.COCKPIT_DATA_DIR || path.join(process.cwd(), "data", "cockpit-agent"));

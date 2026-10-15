@@ -11,20 +11,13 @@ import {
   DEFAULT_LAYOUT,
   type Tone,
 } from "@shared/cockpit";
+import { CardDialog } from "./CardDialog";
 import { type AskImage, MAX_ASK_IMAGES, precheckImageFile, sniffImageType } from "@shared/ask-images";
 
 const GLYPH: Record<Tone, string> = { g: "✓", a: "⚠", r: "✕", d: "–" };
 const TONE_WORD: Record<Tone, string> = { g: "ok", a: "needs attention", r: "broken", d: "no data" };
 const COLLAPSE_KEY = "cockpit.cards.collapsed";
 
-/** Tells the cockpit (the parent window) to open its own dialog for a card. */
-function openInCockpit(id: CardId) {
-  try {
-    window.parent.postMessage({ type: "cockpit-open", sec: id }, "*");
-  } catch {
-    // no parent (opened directly): nothing to open
-  }
-}
 
 function Spark({ values }: { values: number[] }) {
   const max = Math.max(1, ...values);
@@ -62,8 +55,8 @@ function MeterRow({ label, pct }: { label: string; pct: number }) {
   );
 }
 
-function Card({ card, size, fill }: { card: CockpitCard; size?: string; fill?: boolean }) {
-  const label = `${card.title}: ${card.headline}. ${card.sub}${card.chip ? `. ${card.chip}` : ""}. Status ${TONE_WORD[card.tone]}. Opens details in the cockpit.`;
+function Card({ card, size, fill, onOpen }: { card: CockpitCard; size?: string; fill?: boolean; onOpen: (id: CardId, el: HTMLElement) => void }) {
+  const label = `${card.title}: ${card.headline}. ${card.sub}${card.chip ? `. ${card.chip}` : ""}. Status ${TONE_WORD[card.tone]}. Opens its details.`;
   return (
     <button
       type="button"
@@ -71,7 +64,8 @@ function Card({ card, size, fill }: { card: CockpitCard; size?: string; fill?: b
       data-card={card.id}
       aria-label={label}
       title={`${card.headline} · ${card.sub}`}
-      onClick={() => openInCockpit(card.id)}
+      aria-haspopup="dialog"
+      onClick={(e) => onOpen(card.id, e.currentTarget)}
     >
       <span className="cp-edge" />
       <span className="cp-title">
@@ -325,7 +319,13 @@ export function CardRegion() {
   const layoutQ = useActionQuery<CockpitLayout>("get-layout", {}, { refetchInterval: 5000 });
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
   const [askOpen, setAskOpen] = useState(false);
+  const [openId, setOpenId] = useState<CardId | null>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
+  const openCard = useCallback((id: CardId, el: HTMLElement) => {
+    openerRef.current = el;
+    setOpenId(id);
+  }, []);
 
   useEffect(() => setCollapsed(readCollapsed()), []);
 
@@ -447,12 +447,17 @@ export function CardRegion() {
             </button>
             <div className="cp-grid">
               {cards.map((c, i) => (
-                <Card key={c.id} card={c} size={layout.size[c.id]} fill={i === fillIndex} />
+                <Card key={c.id} card={c} size={layout.size[c.id]} fill={i === fillIndex} onOpen={openCard} />
               ))}
             </div>
           </section>
         );
       })}
+      <CardDialog
+        card={openId ? (byId.get(openId) ?? placeholder(openId)) : null}
+        onClose={() => setOpenId(null)}
+        returnTo={openerRef.current}
+      />
     </div>
   );
 }

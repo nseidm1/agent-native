@@ -339,32 +339,54 @@ export function mapState(j: J, now = Date.now()): CockpitCard[] {
 
 export const COCKPIT_STATE_URL = process.env.COCKPIT_STATE_URL || "http://127.0.0.1:5217/api/state";
 const CACHE_MS = 3000;
-let cache: { at: number; result: CardsResult } | null = null;
-let inflight: Promise<CardsResult> | null = null;
 
-/** Fetches the full state (8 s timeout), cached 3 s in-process; one fetch at a time. */
-export async function getCards(): Promise<CardsResult> {
-  const now = Date.now();
-  if (cache && now - cache.at < CACHE_MS) return cache.result;
-  if (inflight) return inflight;
-  inflight = (async () => {
+export interface StateRead {
+  at: number;
+  ok: boolean;
+  error?: string;
+  /** The last good full state (kept while the cockpit is unreachable), or null before the first read. */
+  j: J | null;
+}
+
+let stateCache: { at: number; read: StateRead } | null = null;
+let stateInflight: Promise<StateRead> | null = null;
+let lastGood: { at: number; j: J } | null = null;
+
+/** The cockpit's full state (8 s timeout), cached 3 s in-process; one fetch at a time. Shared by get-cards and get-card-detail. */
+export async function getState(): Promise<StateRead> {
+  if (stateCache && Date.now() - stateCache.at < CACHE_MS) return stateCache.read;
+  if (stateInflight) return stateInflight;
+  stateInflight = (async () => {
     try {
       const res = await fetch(COCKPIT_STATE_URL, { signal: AbortSignal.timeout(8000) });
       if (!res.ok) throw new Error("cockpit answered HTTP " + res.status);
       const j = await res.json();
-      const result: CardsResult = { at: Date.now(), ok: true, cards: mapState(j) };
-      cache = { at: Date.now(), result };
-      return result;
+      lastGood = { at: Date.now(), j };
+      const read: StateRead = { at: lastGood.at, ok: true, j };
+      stateCache = { at: Date.now(), read };
+      return read;
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      // keep showing the last good cards, marked stale, rather than blanking the region
-      const result: CardsResult = cache
-        ? { ...cache.result, ok: false, error: "cockpit unreachable: " + msg }
-        : { at: Date.now(), ok: false, error: "cockpit unreachable: " + msg, cards: CARD_IDS.map(noDataCard) };
-      return result;
+      // keep the last good state, marked stale, rather than blanking the region
+      return { at: lastGood ? lastGood.at : Date.now(), ok: false, error: "cockpit unreachable: " + msg, j: lastGood ? lastGood.j : null };
     } finally {
-      inflight = null;
+      stateInflight = null;
     }
   })();
-  return inflight;
+  return stateInflight;
+}
+
+let cardsCache: { j: J; result: CardsResult } | null = null;
+
+/** The 14 compact cards from the shared state read; mapped once per state object. */
+export async function getCards(): Promise<CardsResult> {
+  const r = await getState();
+  if (!r.j) return { at: r.at, ok: false, error: r.error, cards: CARD_IDS.map(noDataCard) };
+  if (!cardsCache || cardsCache.j !== r.j) cardsCache = { j: r.j, result: { at: r.at, ok: true, cards: mapState(r.j) } };
+  return r.ok ? cardsCache.result : { ...cardsCache.result, ok: false, error: r.error };
+}
+
+/** One card's face (tone, headline, sub, chip) from a state object; the dialog header repeats it. */
+export function faceOf(j: J, id: CardId, now = Date.now()): CockpitCard {
+  return mapState(j, now).find((c) => c.id === id) || noDataCard(id);
 }

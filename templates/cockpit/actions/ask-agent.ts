@@ -6,7 +6,7 @@ import { AgentError, askAgent } from "../server/cockpit/agent.js";
 
 /**
  * The "Ask agent" panel: runs the Mac's logged-in Claude Code CLI against this
- * app's own MCP tools (get-cards, get-layout, set-layout) and nothing else.
+ * app's own MCP tools (get-cards, get-card-detail, get-layout, set-layout) and nothing else;
  * UI only: never an agent or MCP tool, so a run cannot start another run.
  * server/middleware/ask-agent-loopback.ts refuses any non-loopback request.
  * Up to 3 images ride along as base64; the body bound is sized to exactly

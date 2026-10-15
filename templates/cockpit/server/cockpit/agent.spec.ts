@@ -18,9 +18,12 @@ describe("ask-agent bounds", () => {
     }
   });
 
-  it("allows exactly the three cockpit MCP tools and disables every built-in tool", () => {
-    expect(ALLOWED_TOOLS).toEqual(["mcp__cockpit__get-cards", "mcp__cockpit__get-layout", "mcp__cockpit__set-layout"]);
+  it("allows exactly the four cockpit MCP tools (one read added), never a write, and disables every built-in tool", () => {
+    expect(ALLOWED_TOOLS).toEqual(["mcp__cockpit__get-cards", "mcp__cockpit__get-card-detail", "mcp__cockpit__get-layout", "mcp__cockpit__set-layout"]);
     const args = buildArgs("--dangerously-skip-permissions", "/x/mcp.json");
+    for (const w of ["cockpit-board-card-action", "cockpit-halo-model", "cockpit-job-start"]) {
+      expect(args[args.indexOf("--disallowedTools") + 1]).toContain("mcp__cockpit__" + w);
+    }
     expect(args[args.indexOf("--tools") + 1]).toBe("");
     expect(args[args.indexOf("--allowedTools") + 1]).toBe(ALLOWED_TOOLS.join(","));
     expect(args[args.indexOf("--disallowedTools") + 1]).toContain("mcp__cockpit__ask_app");
