@@ -1,4 +1,6 @@
+import { useActionQuery } from "@agent-native/core/client/hooks";
 import type { ReactNode } from "react";
+import type { BoardView } from "@shared/cockpit-board";
 import type { OfficeTile, OfficeView } from "@shared/cockpit-home";
 
 /** Line icons drawn in the tile's tone (currentColor); a tile without one keeps the server's emoji. */
@@ -57,21 +59,35 @@ const ICONS: Record<OfficeTile["id"], ReactNode> = {
  * (Working, Waiting, Commits, Landed today, Halo up, Refused). Its own file so
  * the office restyle (FA-19080) can change the look without touching the rest
  * of the home column. A click opens Who's working; the Commits tile opens the
- * commit queue.
+ * commit queue; the Waiting tile counts the board's open cards not started and
+ * not finished (get-board, the Board window's own read) and opens the Board.
  */
-export function OfficeCard({ office, onOpen }: { office: OfficeView; onOpen: (slug: string, el: HTMLElement) => void }) {
+const NOT_WAITING = new Set(["in-progress", "release-ready", "released"]);
+
+export function OfficeCard({ office, onOpen, onBoard }: { office: OfficeView; onOpen: (slug: string, el: HTMLElement) => void; onBoard: (el: HTMLElement) => void }) {
+  const boardQ = useActionQuery<BoardView>("get-board", {}, { refetchInterval: 15000 });
+  const b = boardQ.data;
+  const waiting = b && b.ok !== false ? b.cards.filter((c) => !NOT_WAITING.has(c.column || "")).length : null;
+  const waitTitle =
+    waiting == null
+      ? boardQ.isError || (b && b.ok === false)
+        ? "Waiting: no data (the board could not be read). Click to open the Board."
+        : "Waiting: reading the board…"
+      : `Waiting: ${waiting} open ${waiting === 1 ? "card" : "cards"} on the board not started and not finished. Click to open the Board.`;
+  const tiles = office.tiles?.map((t) => (t.id === "queue" ? { ...t, n: waiting, suffix: "", title: waitTitle, live: false } : t));
   return (
     <div
       className="cf-office"
       role="button"
       tabIndex={0}
       aria-haspopup="dialog"
-      aria-label={office.aria}
+      aria-label={office.aria + (waiting == null ? "" : `; ${waiting} cards waiting on the board (click the Waiting tile to open the Board)`)}
       title={office.title || undefined}
       data-testid="cf-office"
       onClick={(e) => {
-        const q = (e.target as HTMLElement).closest("[data-queue]");
-        onOpen(q ? "queue" : "agents", e.currentTarget);
+        const t = e.target as HTMLElement;
+        if (t.closest("[data-board]")) return onBoard(e.currentTarget);
+        onOpen(t.closest("[data-queue]") ? "queue" : "agents", e.currentTarget);
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
@@ -84,10 +100,17 @@ export function OfficeCard({ office, onOpen }: { office: OfficeView; onOpen: (sl
         <span className="cf-oft">Office</span>
         <span className="cf-ofs">{office.head}</span>
       </div>
-      {office.tiles ? (
+      {tiles ? (
         <div className="cf-oftiles">
-          {office.tiles.map((t) => (
-            <div key={t.id} className={`cf-oftile t-${t.tone}${t.live ? " live" : ""}`} title={t.title} data-queue={t.queue ? "1" : undefined} data-of={t.id}>
+          {tiles.map((t) => (
+            <div
+              key={t.id}
+              className={`cf-oftile t-${t.tone}${t.live ? " live" : ""}`}
+              title={t.title}
+              data-queue={t.queue ? "1" : undefined}
+              data-board={t.id === "queue" ? "1" : undefined}
+              data-of={t.id}
+            >
               <span className="cf-ofl">{t.label}</span>
               <span className="cf-ofbody">
                 <span className="cf-ofi" aria-hidden="true">
@@ -100,7 +123,7 @@ export function OfficeCard({ office, onOpen }: { office: OfficeView; onOpen: (sl
                   )}
                 </span>
                 <span className="cf-ofn">
-                  <b>{t.n == null ? "…" : t.n}</b>
+                  {t.id === "queue" && waiting == null && (boardQ.isError || b?.ok === false) ? <small>no data</small> : <b>{t.n == null ? "…" : t.n}</b>}
                   {t.suffix ? <small>{t.suffix}</small> : null}
                 </span>
               </span>

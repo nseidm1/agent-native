@@ -353,7 +353,7 @@ export function Home({ home, canWrite, notify, onOpen, onDone }: { home: HomeVie
           <QuestionsButton q={home.lane.questions} onOpen={(el) => onOpen({ legacy: "questions" }, el)} />
           <BudgetBox budget={home.budget} canWrite={canWrite} notify={notify} onDone={onDone} />
         </div>
-        <OfficeCard office={home.office} onOpen={(slug, el) => onOpen({ legacy: slug }, el)} />
+        <OfficeCard office={home.office} onOpen={(slug, el) => onOpen({ legacy: slug }, el)} onBoard={(el) => onOpen({ card: "board" }, el)} />
       </div>
       <div className="cf-faces" role="group" aria-label="Cockpit faces">
         {home.faces.map((f) => (
