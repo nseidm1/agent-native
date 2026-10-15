@@ -593,8 +593,8 @@
       "maxLength": 80
      },
      "option": {
-      "type": "string",
-      "maxLength": 400
+      "type": "number",
+      "maximum": 100
      },
      "text": {
       "type": "string",
@@ -618,8 +618,8 @@
       "maxLength": 80
      },
      "option": {
-      "type": "string",
-      "maxLength": 400
+      "type": "number",
+      "maximum": 100
      },
      "text": {
       "type": "string",

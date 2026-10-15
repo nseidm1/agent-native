@@ -45,7 +45,7 @@ describe("FA-19134: the Questions for you window", () => {
     expect(s.sub).toBe("Blocks a launch · Agents · Asked by the work ledger · 10 min ago");
     const opt = s.items!.find((i) => i.strong === "Land it (recommended)")!;
     expect(opt.tone).toBe("g");
-    expect(opt.actions![0]).toMatchObject({ kind: "question", args: { verb: "answer", id: "cq-abc", option: "Land it" } });
+    expect(opt.actions![0]).toMatchObject({ kind: "question", args: { verb: "answer", id: "cq-abc", option: 0 } });
     expect(opt.actions![0].confirm).toBe("Answer “Land it”?");
     const free = s.items!.find((i) => i.strong === "Something else")!;
     expect(free.actions![0].input).toMatchObject({ name: "text", required: true });

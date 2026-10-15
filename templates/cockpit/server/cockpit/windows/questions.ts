@@ -96,7 +96,7 @@ function openSections(q: Question, i: number, n: number, now: number): DetailSec
       strong: label + (o.recommended ? " (recommended)" : ""),
       text: [o.consequence || "", o.recommended && o.reason ? "Why we recommend it: " + o.reason : ""].filter(Boolean).join(" · "),
       tone: o.recommended ? "g" : undefined,
-      actions: [act("Answer", { verb: "answer", id: q.id, option: label }, { confirm: "Answer “" + label + "”?" })],
+      actions: [act("Answer", { verb: "answer", id: q.id, option: k }, { confirm: "Answer “" + label + "”?" })],
     });
   });
   items.push({
@@ -201,7 +201,7 @@ export function questionsWindow(v: QuestionsData | null, c: QuestionCounts | nul
     text:
       "The line saying how the system answers questions that fit its shape (questions shape: mode, calibration, overrules in 24 h) is not on the cockpit client yet" +
       (total > recent.length ? ", and the answered list here is the newest " + recent.length + " of " + total : "") +
-      ". Links in Tell me more open from the legacy page. Picking a choice (Answer on an option, or Overrule) sends the choice's label, as the client's questions actions take it; the cockpit's questions act reads a choice by its number, so until the client maps the label it refuses a choice with \"Pick an option or write an answer\": type the answer, or pick it on the legacy page.",
+      ". Links in Tell me more open from the legacy page.",
   });
   return {
     id: "questions",
