@@ -139,7 +139,11 @@ export function StudioView({ s, canWrite, onDone, onBack }: { s: StudioData; can
               aria-expanded={open === t.k}
               aria-controls="st-detail"
               aria-label={t.label + ": " + t.v + (t.s ? ", " + t.s : "") + (t.need ? ". Needs you" : "") + ". Open the details"}
-              onClick={() => setOpen(open === t.k ? null : t.k)}
+              onClick={() => {
+                const k = open === t.k ? null : t.k;
+                setOpen(k);
+                if (k) say(k + " details open");
+              }}
             >
               <span className="k">
                 {t.busy ? <i className="ap-spin" aria-hidden="true" /> : <i className={"st-dot t-" + (t.tone || "n")} aria-hidden="true" />}

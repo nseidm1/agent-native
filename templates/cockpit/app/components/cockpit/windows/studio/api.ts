@@ -29,7 +29,7 @@ export function useStudioRead<T = any>(app: string, root: Root, path: string, o:
   } as any);
 }
 /** One studio read, imperatively (a poll loop that decides its own pace). */
-export const studioRead = <T = any>(app: string, root: Root, path: string, q: { n?: number; model?: string } = {}) =>
+export const studioRead = <T = any>(app: string, root: Root, path: string, q: { n?: number; model?: string; focus?: string } = {}) =>
   callAction<T>("get-studio" as any, { app, root, path, ...q } as any, { method: "GET" }) as Promise<T>;
 /** One studio write, imperatively: resolves the studio's answer, rejects with its refusal in its own words. */
 export async function studioWrite<T = any>(app: string, root: WriteRoot, path: string, body: Record<string, unknown> = {}): Promise<T> {

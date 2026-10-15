@@ -1497,6 +1497,9 @@ function FilesPane({ v, refetch }: { v: any; refetch: () => void }) {
   const [lt, setLt] = useState("");
   const fi = useRef<HTMLInputElement>(null);
   const [others, setOthers] = useState(false);
+  // the app's asset library across its cards (card-studio.js libraryBox "All of <app>": the studio's GET app/<app>/assets, carried by MI-380)
+  const lib = useStudioRead<{ app: string; assets: any[] }>(st.app, "studio", "app/" + app + "/assets", { enabled: others && !!app });
+  const fromOthers = lib.data && Array.isArray(lib.data.assets) ? lib.data.assets.filter((a: any) => a.card !== "APP-" + app) : null;
   const adopt = rec.jobs.filter(
     (j: any) =>
       j.decision &&
@@ -1623,11 +1626,49 @@ function FilesPane({ v, refetch }: { v: any; refetch: () => void }) {
         {others ? (
           <>
             <h3 className="sd-h3 sd-mt10">
-              {"From other cards of " + appName}
+              {"From other cards of " + appName + (fromOthers ? " (" + fromOthers.length + ")" : "")}
             </h3>
-            <div className="sd-empty">
-              The app's other cards' assets are not on the cockpit client yet.
-            </div>
+            {lib.isError ? (
+              <div className="sd-empty" role="alert">
+                {"Could not read the library: " + (lib.error instanceof Error ? lib.error.message : String(lib.error)).replace(/^Action [\w-]+ failed:\s*/, "")}
+              </div>
+            ) : !fromOthers ? (
+              <div className="sd-empty" role="status">
+                <Spin /> Reading the library…
+              </div>
+            ) : fromOthers.length ? (
+              <div className="sd-lib">
+                {fromOthers.map((a: any) => (
+                  <figure key={a.card + ":" + a.id}>
+                    {a.kind === "palette" ? (
+                      <div className="sd-sws">
+                        {(a.palette || []).map((p: any, i: number) => (
+                          <div className="sd-swc" key={i}>
+                            <i style={{ background: p.hex }} aria-hidden="true" />
+                            {p.hex}
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                    <figcaption>
+                      <b>{assetLabel(a)}</b>
+                      <br />
+                      {(a.kind === "clip" ? "Video (linked) · " : "") + a.license + (a.attribution ? " · " + a.attribution : "") + " · from " + a.card}
+                      {a.pageUrl ? (
+                        <>
+                          <br />
+                          <a href={a.pageUrl} target="_blank" rel="noopener noreferrer">
+                            Source page
+                          </a>
+                        </>
+                      ) : null}
+                    </figcaption>
+                  </figure>
+                ))}
+              </div>
+            ) : (
+              <div className="sd-empty">None yet.</div>
+            )}
           </>
         ) : null}
         <ErrLine text={A.err.lib} onClear={() => A.clear("lib")} />

@@ -19,13 +19,14 @@ export default defineAction({
     path: z.string().max(200).default("").describe("The route within it ('' for its root)"),
     n: z.coerce.number().int().min(1).max(99).optional().describe("qa quote: the number of QA agents"),
     model: z.string().max(24).optional().describe("qa quote: the judge model"),
+    focus: z.string().max(200).optional().describe("qa quote: the flows to focus on (comma-separated)"),
   }),
   http: { method: "GET" },
   readOnly: true,
   mcpTool: true,
-  run: async ({ app, root, path, n, model }) => {
+  run: async ({ app, root, path, n, model, focus }) => {
     try {
-      return await studioGet(app, root, path || "", { ...(n ? { n } : {}), ...(model ? { model } : {}) });
+      return await studioGet(app, root, path || "", { ...(n ? { n } : {}), ...(model ? { model } : {}), ...(focus ? { focus } : {}) });
     } catch (e) {
       if (e instanceof ClientError) fail(e.message, { errorCode: "studio_read_failed", statusCode: e.status >= 400 && e.status < 600 ? e.status : 502 });
       throw e;

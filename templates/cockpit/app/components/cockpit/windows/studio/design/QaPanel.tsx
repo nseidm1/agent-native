@@ -74,8 +74,7 @@ export function QaPanel({ gate, say }: { gate: Gate | null; say: (t: string, ok?
       const o = ovRef.current;
       if (nothingBuilt(o)) return setQuote({ error: "No built screen in the app map yet: QA agents drive built screens (mocks are not in staging)" });
       try {
-        // the client carries quote with n and model only: the focus is not in the quote (it is in the run)
-        setQuote(await studioRead<any>(app, "qa", "quote", { n: s.n, model: s.model }));
+        setQuote(await studioRead<any>(app, "qa", "quote", { n: s.n, model: s.model, ...(s.focus ? { focus: s.focus } : {}) }));
       } catch (e) {
         setQuote({ error: errText(e) });
       }
