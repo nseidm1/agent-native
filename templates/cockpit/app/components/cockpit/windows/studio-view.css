@@ -409,7 +409,10 @@ p.st-sub {
   gap: 12px;
 }
 @media (max-width: 759px) {
-  .cp-dlg.st-modal {
+  .cp-dlg.st-modal,
+  .cp-dlg.st-modal.st-md,
+  .cp-dlg.st-modal.st-lg,
+  .cp-dlg.st-modal.st-xl {
     width: 100vw !important;
     height: 100dvh;
     max-height: 100dvh !important;
