@@ -13,6 +13,7 @@
  *   dead-end           a layout run changed nothing, or the code agent changed nothing
  *   undone             the applied change was undone
  *   re-asked           the same request came again within 10 minutes
+ *   cancelled          a card this ask filed was cancelled or archived by a later ask (FA-19211, cancelled by "Cancel 19211, ...")
  *   classifier-failed  the classifier did not answer; the read default ran
  *
  * BACKFILL: ask-agent.log (one line per ask since FA-18951, kind only) is read
@@ -27,7 +28,7 @@ import type { PartKind } from "./classify.js";
 
 export const ROUTES_FILE = "ask-routes.jsonl";
 export const REASK_WINDOW_MS = 10 * 60_000;
-export const MISROUTE_REASONS = ["escalated", "needs-system", "dead-end", "undone", "re-asked", "classifier-failed"] as const;
+export const MISROUTE_REASONS = ["escalated", "needs-system", "dead-end", "undone", "re-asked", "cancelled", "classifier-failed"] as const;
 export type MisrouteReason = (typeof MISROUTE_REASONS)[number];
 
 /** The path a part finally ran on. */
@@ -117,6 +118,13 @@ export function similarity(a: string, b: string): number {
 }
 export const REASK_SIMILARITY = 0.5;
 
+/** The cards a later ask cancels: its board parts that archive, or (a backfilled row) "cancel/archive [FA-]n" in its words. */
+function cancelledBy(r: RouteRow): string[] {
+  const out = r.parts.filter((p) => p.kind === "board" && p.action === "archive" && p.fa).map((p) => p.fa!);
+  if (r.backfill) for (const m of r.q.matchAll(/\b(?:cancel|archive)\s+(?:card\s+)?(?:FA-?\s?)?(\d{3,6})\b/gi)) out.push("FA-" + m[1]);
+  return out;
+}
+
 export type JobStatusOf = (id: string) => string | null;
 
 /** The outcome of an applied change, resolved from its job: applied, failed, no-change, needs-system, undone, or still applying. */
@@ -138,6 +146,8 @@ export function misrouteReasons(rows: RouteRow[], i: number, jobStatus: JobStatu
     if (o === "undone") why.add("undone");
     if ((p.path === "layout" && o === "unchanged") || o === "no-change") why.add("dead-end");
   }
+  const filed = r.parts.map((p) => p.card).filter((c): c is string => !!c);
+  if (filed.length && rows.slice(i + 1).some((x) => cancelledBy(x).some((fa) => filed.includes(fa)))) why.add("cancelled");
   const t = Date.parse(r.at);
   for (let j = i + 1; j < rows.length; j++) {
     const dt = Date.parse(rows[j].at) - t;

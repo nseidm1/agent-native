@@ -258,11 +258,19 @@ describe("the routing KPI (FA-19087)", () => {
     ];
     const k = routeKpi(rows, (id) => ({ j1: "live", j2: "undone", j3: "needs-system" })[id] ?? null);
     expect(k.asks).toBe(7);
-    expect(k.reasons).toEqual({ escalated: 1, "needs-system": 1, "dead-end": 1, undone: 1, "re-asked": 1, "classifier-failed": 1 });
+    expect(k.reasons).toEqual({ escalated: 1, "needs-system": 1, "dead-end": 1, undone: 1, "re-asked": 1, cancelled: 0, "classifier-failed": 1 });
     expect(k.misrouted).toBe(5); // "hide forge" is both a dead end and re-asked
     expect(k.rate).toBe(0.714);
     expect(k.recent[0].misrouted).toEqual(["classifier-failed"]);
     expect(similarity("hide forge", "hide the forge card please")).toBeGreaterThanOrEqual(0.5);
+    const filedThenCancelled = routeKpi(
+      [
+        row("2026-10-15T08:37:00Z", "On mobile move ask agent to a button on the toolbar", [{ kind: "system", path: "filed", trail: ["filed"], outcome: "filed", card: "FA-19211" }]),
+        row("2026-10-15T08:38:00Z", "Cancel 19211, just move it above the lane card", [{ kind: "board", path: "board", trail: ["board"], outcome: "offered", fa: "FA-19211", action: "archive" }]),
+      ],
+      () => null,
+    );
+    expect(filedThenCancelled.recent[1].misrouted).toEqual(["cancelled"]);
   });
 
   it("backfills ask-agent.log before the first route row, and reads the KPI from the data dir", async () => {
@@ -278,7 +286,9 @@ describe("the routing KPI (FA-19087)", () => {
     writeFileSync(path.join(dir, "ask-routes.jsonl"), JSON.stringify(row("2026-10-15T09:10:00.000Z", "after", [{ kind: "read", path: "read", trail: ["read"], outcome: "answered" }])) + "\n");
     expect(backfillRows(log, "2026-10-15T09:10:00.000Z")).toHaveLength(4);
     const k = await readRouteKpi(dir, () => null);
-    expect(k.backfill).toEqual({ asks: 4, misrouted: 2, rate: 0.5 }); // the phone move twice: a dead end, and re-asked
+    // FA-19211 (filed) was cancelled by the next ask; the phone move twice: a dead end, and re-asked
+    expect(k.backfill).toEqual({ asks: 4, misrouted: 3, rate: 0.75 });
+    expect(k.reasons.cancelled).toBe(1);
     expect(k.live).toEqual({ asks: 1, misrouted: 0, rate: 0 });
   });
 });
