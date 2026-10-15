@@ -11,7 +11,7 @@
 import type { Tone } from "../../../shared/cockpit.js";
 import type { DetailSection } from "../../../shared/cockpit-detail.js";
 import type { WindowDetail } from "../../../shared/cockpit-windows.js";
-import { APP_ID, getMany, thumbShaOf } from "../client.js";
+import { APP_ID, get, getMany, thumbShaOf } from "../client.js";
 import { activityOf, changesOf, identityOf, inboxOf, lifeTiles, requirementsOf, stagingOf, tileChip, type Identity, type LifeTile, type PilotChip, type Requirement, type StudioStaging } from "./studio.js";
 import type { WindowBuilder } from "./registry.js";
 
@@ -244,8 +244,18 @@ const build: WindowBuilder = async (args) => {
     const ids = [...new Set([...((A && A.list) || []), ...((D && D.apps) || [])].map((a) => a.id).filter((id) => APP_ID.test(id)))];
     const want = typeof args.app === "string" && ids.includes(args.app) ? args.app : null;
     const names = ids.flatMap((id) => ["apps/" + id + "/env", "apps/" + id + "/checklist"]);
-    if (want) names.push("apps/" + want + "/lifecycle", "apps/" + want + "/studio", "questions");
     const x = await getMany(names);
+    if (want) {
+      // the open studio's own reads are always fresh (a live read is otherwise reused up to 30 s): staging moves under it as it is viewed
+      const own = ["apps/" + want + "/env", "apps/" + want + "/checklist", "apps/" + want + "/lifecycle", "apps/" + want + "/studio", "questions"];
+      const rs = await Promise.allSettled(own.map((n) => get(n, { fresh: n !== "questions" })));
+      rs.forEach((r, i) => {
+        if (r.status === "fulfilled") {
+          x.data[own[i]] = r.value.data;
+          if (!r.value.ok && r.value.error) x.errors.push(r.value.error);
+        } else x.errors.push(own[i] + ": " + (r.reason instanceof Error ? r.reason.message : String(r.reason)));
+      });
+    }
     const pilots: Pilots = {};
     for (const id of ids) {
       const env = x.data["apps/" + id + "/env"],

@@ -1,5 +1,5 @@
 import { useActionMutation } from "@agent-native/core/client/hooks";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { READ_ONLY } from "../CardDialog";
 import { Thumb, thumbSrc } from "./Thumb";
@@ -56,6 +56,14 @@ export function StudioView({ s, canWrite, onDone, onBack }: { s: StudioData; can
     },
     onError: (e) => setMsg({ ok: false, text: s.name + " staging did not start: " + errText(e) }),
   });
+  // VIEWING THE STUDIO IS STAGING (the legacy studio's rule, env-api.mjs: this Mac or a device past the write gate brings a stopped web app's
+  // staging up, cutting its copy first if there is none, when it opens the studio): the same start (apps.staging -> M.staging.start), once per open
+  const viewed = useRef<string | null>(null);
+  useEffect(() => {
+    if (viewed.current === s.app || !canWrite || s.platform !== "web" || s.staging.running || s.staging.building) return;
+    viewed.current = s.app;
+    start.mutate({ app: s.app });
+  }, [s.app, canWrite, s.platform, s.staging.running, s.staging.building]); // eslint-disable-line react-hooks/exhaustive-deps
   const id = s.identity;
   const tile = s.tiles.find((t) => t.k === open) || null;
   return (
