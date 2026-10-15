@@ -1,4 +1,3 @@
-import { agentNativePath } from "@agent-native/core/client/api-path";
 import { useActionMutation, useActionQuery, useDbSync } from "@agent-native/core/client/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -13,6 +12,7 @@ import {
   type Tone,
 } from "@shared/cockpit";
 import { AppliedBanner, ApplyProgress } from "./ApplyStatus";
+import { ensureUiCapability } from "@/lib/ui-capability";
 import { BoardDialog } from "./BoardDialog";
 import { CardDialog } from "./CardDialog";
 import { type AskImage, MAX_ASK_IMAGES, precheckImageFile, sniffImageType } from "@shared/ask-images";
@@ -166,7 +166,7 @@ function AskPanel({ onClose }: { onClose: () => void }) {
   // ask-agent is UI-only: take the browser's UI capability when the panel opens, so the first ask does not go out
   // without it and come back 403 ui_capability_required before the framework's own retry (a console error in the cockpit)
   useEffect(() => {
-    void fetch(agentNativePath("/_agent-native/ui-capability"), { credentials: "same-origin", cache: "no-store" }).catch(() => {});
+    void ensureUiCapability(); // FA-19155: the one shared capability request (app/lib/ui-capability.ts)
   }, []);
 
   const addFiles = async (files: File[]) => {

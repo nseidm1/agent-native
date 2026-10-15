@@ -1,6 +1,8 @@
 import { useActionMutation, useActionQuery } from "@agent-native/core/client/hooks";
 import { useEffect, useRef, useState } from "react";
 
+import { useUiCapability } from "@/lib/ui-capability";
+
 /**
  * FA-19080: an Ask agent change being APPLIED. The panel follows the job
  * (get-ask-job) through its gates, reloads the region once it restarted on the
@@ -94,7 +96,8 @@ export function UndoButton({ job, onStarted }: { job: AskJob; onStarted: (id: st
 /** Follows one job until it ends; reloads the region once a live change restarted it. */
 export function ApplyProgress({ id, onFollow }: { id: string; onFollow: (id: string) => void }) {
   const [done, setDone] = useState(false);
-  const q = useActionQuery<JobRead>("get-ask-job", { id }, { refetchInterval: done ? false : 1500, retry: true });
+  const cap = useUiCapability(); // FA-19155: get-ask-job is uiOnly; never send it before the capability cookie
+  const q = useActionQuery<JobRead>("get-ask-job", { id }, { refetchInterval: done ? false : 1500, retry: true, enabled: cap });
   const job = q.data?.job ?? null;
   const reloaded = useRef(false);
   useEffect(() => {
@@ -152,7 +155,8 @@ const DISMISS_KEY = "cockpit.apply.dismissed";
 export function AppliedBanner() {
   const [follow, setFollow] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<string | null>(null);
-  const q = useActionQuery<JobRead>("get-ask-job", {}, { refetchInterval: 60_000 });
+  const cap = useUiCapability(); // FA-19155: the region mounts this at once; its first read used to race the capability (403 ui_capability_required)
+  const q = useActionQuery<JobRead>("get-ask-job", {}, { refetchInterval: 60_000, enabled: cap });
   useEffect(() => {
     try {
       setDismissed(window.localStorage.getItem(DISMISS_KEY));
