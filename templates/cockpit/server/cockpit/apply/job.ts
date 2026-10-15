@@ -189,6 +189,8 @@ export interface ApplyDeps {
 
 // ---------- job records ----------
 const jobFile = (P: ApplyPaths, id: string) => path.join(P.jobsDir, id + ".json");
+/** A job record's own file name: not the restarter's .restart.json or the vitest report beside it. */
+export const JOB_FILE = /^(ask|undo)-\d{14}-[0-9a-f]{6}\.json$/;
 export function saveJob(P: ApplyPaths, j: ApplyJob): void {
   mkdirSync(P.jobsDir, { recursive: true });
   const f = jobFile(P, j.id);
@@ -211,7 +213,7 @@ export function readJob(P: ApplyPaths, id?: string): ApplyJob | null {
       if (!/^[a-z0-9-]{6,64}$/.test(id)) return null;
       f = jobFile(P, id);
     } else {
-      const all = readdirSync(P.jobsDir).filter((x) => x.endsWith(".json"));
+      const all = readdirSync(P.jobsDir).filter((x) => JOB_FILE.test(x));
       if (!all.length) return null;
       f = path.join(P.jobsDir, all.map((x) => ({ x, t: statSync(path.join(P.jobsDir, x)).mtimeMs })).sort((a, b) => b.t - a.t)[0].x);
     }
@@ -516,7 +518,7 @@ export function startUndo(P: ApplyPaths, ofId: string | undefined, deps: Pick<Ap
 function latestLive(P: ApplyPaths): ApplyJob | null {
   try {
     const all = readdirSync(P.jobsDir)
-      .filter((x) => /^ask-.*\.json$/.test(x) && !x.endsWith(".restart.json"))
+      .filter((x) => JOB_FILE.test(x) && x.startsWith("ask-"))
       .sort()
       .reverse();
     for (const f of all) {

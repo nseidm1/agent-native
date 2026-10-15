@@ -104,6 +104,54 @@ async function followInner(page, label, maxMin) {
   return { status: "timeout" };
 }
 
+
+async function afterShots(base0, shapeBefore) {
+  const a = await open(1280, 900);
+  const banner = await a.page.locator('[data-testid="applied-banner"]').getAttribute("data-job").catch(() => null);
+  check("the region shows the applied change with its Undo", !!banner, String(banner));
+  writeFileSync(state, JSON.stringify({ base0, job: banner, commit: git("log", "-1", "--format=%H", "--grep", "Ask agent applied:"), shapeBefore: shapeBefore ?? (await shape(a.page)) }, null, 1));
+  await a.page.screenshot({ path: path.join(out, "after-1280.png"), fullPage: true });
+  await noSideways(a.page, 1280);
+  await a.ctx.close();
+  const phone = await open(390, 844);
+  await phone.page.screenshot({ path: path.join(out, "after-390.png"), fullPage: true });
+  await noSideways(phone.page, 390);
+  await phone.ctx.close();
+  // the whole cockpit (FA-19087) and, when it has one, its office card on its own
+  for (const [w, h] of [
+    [1280, 900],
+    [390, 844],
+  ]) {
+    const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
+    const p = await ctx.newPage();
+    p.on("console", (m) => {
+      if (m.type() === "error") noteError(`cockpit ${w}: ${m.text().slice(0, 160)} @ ${(m.location()?.url || "").replace(base, "")}`);
+    });
+    await p.goto(base + "/cards/cockpit", { waitUntil: "domcontentloaded" });
+    await p.waitForSelector('[data-testid="cockpit-full"]', { timeout: 30_000 });
+    await p.waitForTimeout(4000);
+    await p.screenshot({ path: path.join(out, `after-cockpit-${w}.png`), fullPage: true });
+    const office = p.locator('[data-testid="cf-office"]');
+    if (await office.count()) await office.first().screenshot({ path: path.join(out, `after-office-${w}.png`) });
+    await noSideways(p, "cockpit " + w);
+    await ctx.close();
+  }
+  if (base0) check("the fork moved by the applied commit", git("rev-parse", "HEAD") !== base0, git("log", "--oneline", "-1"));
+  // side by side with the mockup
+  if (image) {
+    const ctx = await browser.newContext({ viewport: { width: 2480, height: 1000 }, deviceScaleFactor: 1 });
+    const p = await ctx.newPage();
+    const b64 = (f) => "data:image/png;base64," + readFileSync(f).toString("base64");
+    const live = existsSync(path.join(out, "after-office-1280.png")) ? path.join(out, "after-office-1280.png") : path.join(out, "after-1280.png");
+    await p.setContent(`<body style="margin:0;background:#03070f;display:flex;gap:24px;padding:24px;align-items:flex-start;font:14px sans-serif;color:#8fdcff">
+      <figure style="margin:0;width:1168px"><figcaption>Mockup (console's attachment)</figcaption><img style="width:100%" src="${b64(image)}"></figure>
+      <figure style="margin:0;width:1240px"><figcaption>Live after the Ask agent applied it (1280)</figcaption><img style="width:100%" src="${b64(live)}"></figure></body>`);
+    await p.waitForTimeout(500);
+    await p.screenshot({ path: path.join(out, "side-by-side.png"), fullPage: true });
+    await ctx.close();
+  }
+}
+
 try {
   if (phase === "apply") {
     const before = await open(1280, 900);
@@ -125,48 +173,11 @@ try {
     await before.page.screenshot({ path: path.join(out, "ask-applying-1280.png") });
     const end = await follow(before.page, "apply", 35);
     check("the change went live and the region reloaded on it", !!end.reloaded, JSON.stringify(end).slice(0, 800));
-    const job = end.banner ? end.banner.split(":")[1] : "";
-    writeFileSync(state, JSON.stringify({ base0, job, shapeBefore }, null, 1));
-    await before.page.waitForTimeout(3000);
-    await before.page.screenshot({ path: path.join(out, "after-1280.png"), fullPage: true });
-    await noSideways(before.page, 1280);
     await before.ctx.close();
-    const phone = await open(390, 844);
-    await phone.page.screenshot({ path: path.join(out, "after-390.png"), fullPage: true });
-    await noSideways(phone.page, 390);
-    await phone.ctx.close();
-    // the whole cockpit (FA-19087) and, when it has one, its office card on its own
-    for (const [w, h] of [
-      [1280, 900],
-      [390, 844],
-    ]) {
-      const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
-      const p = await ctx.newPage();
-      p.on("console", (m) => {
-        if (m.type() === "error") noteError(`cockpit ${w}: ${m.text().slice(0, 160)} @ ${(m.location()?.url || "").replace(base, "")}`);
-      });
-      await p.goto(base + "/cards/cockpit", { waitUntil: "domcontentloaded" });
-      await p.waitForSelector('[data-testid="cockpit-full"]', { timeout: 30_000 });
-      await p.waitForTimeout(4000);
-      await p.screenshot({ path: path.join(out, `after-cockpit-${w}.png`), fullPage: true });
-      const office = p.locator('[data-testid="cf-office"]');
-      if (await office.count()) await office.first().screenshot({ path: path.join(out, `after-office-${w}.png`) });
-      await noSideways(p, "cockpit " + w);
-      await ctx.close();
-    }
-    check("the fork moved by the applied commit", git("rev-parse", "HEAD") !== base0, git("log", "--oneline", "-1"));
-    // side by side with the mockup
-    if (image) {
-      const ctx = await browser.newContext({ viewport: { width: 2480, height: 1000 }, deviceScaleFactor: 1 });
-      const p = await ctx.newPage();
-      const b64 = (f) => "data:image/png;base64," + readFileSync(f).toString("base64");
-      await p.setContent(`<body style="margin:0;background:#03070f;display:flex;gap:24px;padding:24px;align-items:flex-start;font:14px sans-serif;color:#8fdcff">
-        <figure style="margin:0;width:1168px"><figcaption>Mockup (console's attachment)</figcaption><img style="width:100%" src="${b64(image)}"></figure>
-        <figure style="margin:0;width:1240px"><figcaption>Live after the Ask agent applied it (1280)</figcaption><img style="width:100%" src="${b64(existsSync(path.join(out, "after-office-1280.png")) ? path.join(out, "after-office-1280.png") : path.join(out, "after-1280.png"))}"></figure></body>`);
-      await p.waitForTimeout(500);
-      await p.screenshot({ path: path.join(out, "side-by-side.png"), fullPage: true });
-      await ctx.close();
-    }
+    await afterShots(base0, shapeBefore);
+  } else if (phase === "after") {
+    // the shots alone, for a change that went live while no proof was watching (--base0: the commit before it)
+    await afterShots(arg("--base0", ""), null);
   } else {
     const st = JSON.parse(readFileSync(state, "utf8"));
     const page = (await open(1280, 900)).page;
@@ -180,15 +191,18 @@ try {
     await page.screenshot({ path: path.join(out, "undone-1280.png"), fullPage: true });
     const now = await shape(page);
     check("the region is back to its pre-apply shape", JSON.stringify(now) === JSON.stringify(st.shapeBefore), JSON.stringify(now).slice(0, 300));
+    // the files the applied commit changed are back to what they were before it (other commits may have landed since)
+    const applied = st.commit || git("log", "-1", "--format=%H", "--grep", "Ask agent applied:");
+    const files = git("show", "--name-only", "--format=", applied).split("\n").filter(Boolean);
     const same = (() => {
       try {
-        execFileSync("git", ["diff", "--quiet", st.base0, "HEAD", "--", "."], { cwd: APP });
+        execFileSync("git", ["diff", "--quiet", applied + "^", "HEAD", "--", ...files.map((f) => path.relative(APP, path.join(APP, "..", "..", f)))], { cwd: APP });
         return true;
       } catch {
         return false;
       }
     })();
-    check("the fork's templates/cockpit equals the pre-apply commit's", same, st.base0.slice(0, 10) + " vs " + git("rev-parse", "--short", "HEAD"));
+    check("every file the applied commit changed is back to its pre-apply content", same && files.length > 0, `${applied.slice(0, 10)}: ${files.join(", ")}`);
     await noSideways(page, 1280);
   }
 } finally {

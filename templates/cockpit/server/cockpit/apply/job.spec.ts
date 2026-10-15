@@ -110,6 +110,17 @@ describe("FA-19080: an Ask change goes live only through the gates, in order", (
     expect(readJob(h.P, j.id)!.status).toBe("live");
   });
 
+  it("the newest job is a job record, never the restarter's note or the vitest report beside it; the restart folds in", async () => {
+    const h = harness();
+    const j = await runApply(h.P, h.job(), h.input, h.deps);
+    // written after the job, so newer by mtime
+    writeFileSync(path.join(h.P.jobsDir, j.id + "-vitest.json"), JSON.stringify({ numPassedTests: 1 }));
+    writeFileSync(path.join(h.P.jobsDir, j.id + ".restart.json"), JSON.stringify({ ok: true, pid: 4242, detail: "pid 4242 on :5241" }));
+    const latest = readJob(h.P)!;
+    expect(latest.id).toBe(j.id);
+    expect(latest.phases.find((p) => p.name === "restart")).toMatchObject({ state: "ok", detail: "pid 4242 on :5241" });
+  });
+
   for (const fail of ["typecheck", "client-only", "build", "screenshot"]) {
     it(`a ${fail} failure discards the change: nothing merges, nothing restarts`, async () => {
       const h = harness({ fail });
