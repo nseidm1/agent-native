@@ -6,12 +6,27 @@
  * over its own MCP endpoint. Built-in tools (shell, files, web) are disabled
  * with --tools "", other MCP servers are excluded with --strict-mcp-config,
  * and anything not allow-listed is denied by --permission-mode dontAsk.
+ *
+ * Image attachments (at most 3): each is checked by its magic bytes and size,
+ * written to the data dir under a random name, named in the prompt, and made
+ * readable by enabling the built-in Read tool with an allow rule for exactly
+ * those paths (Read(//<abs path>)); any other Read is denied by dontAsk. The
+ * files are deleted when the run ends, whatever the outcome.
  */
 import { spawn } from "node:child_process";
-import { appendFile, mkdir, writeFile } from "node:fs/promises";
+import { randomBytes } from "node:crypto";
+import { appendFile, mkdir, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
+import {
+  ASK_IMAGE_EXT,
+  type AskImage,
+  MAX_ASK_IMAGE_B64,
+  MAX_ASK_IMAGE_BYTES,
+  MAX_ASK_IMAGES,
+  sniffImageType,
+} from "../../shared/ask-images.js";
 import { readLayout } from "./layout.js";
 
 export const AGENT_TIMEOUT_MS = 120_000;
@@ -43,8 +58,24 @@ export function isLoopbackAddress(ip: string | undefined | null): boolean {
   return a === "127.0.0.1" || a === "::1" || a === "::ffff:127.0.0.1";
 }
 
+/** Characters a path may hold to go into a permission rule verbatim (no glob, no parenthesis, no space). */
+const RULE_SAFE_PATH = /^\/[A-Za-z0-9._\/-]+$/;
+
+/** The CLI permission rule that allows Read of exactly this absolute path ("//" marks an absolute path). */
+export function readRuleFor(absPath: string): string {
+  if (!RULE_SAFE_PATH.test(absPath) || absPath.includes("..")) throw new AgentError("Image path is not safe to allow-list.");
+  return `Read(/${absPath})`;
+}
+
+/** The prompt the CLI receives: the question, then the attached images' paths when there are any. */
+export function promptWithImages(question: string, imagePaths: string[]): string {
+  if (!imagePaths.length) return question;
+  return `${question}\n\nAttached images: ${imagePaths.join(", ")} - view them with the Read tool.`;
+}
+
 /** The argv for one run. Pure, so the bounds are testable without spawning. */
-export function buildArgs(question: string, mcpConfigPath: string): string[] {
+export function buildArgs(question: string, mcpConfigPath: string, imagePaths: string[] = []): string[] {
+  const allowed = [...ALLOWED_TOOLS, ...imagePaths.map(readRuleFor)];
   return [
     "-p",
     "--output-format",
@@ -55,9 +86,9 @@ export function buildArgs(question: string, mcpConfigPath: string): string[] {
     "--mcp-config",
     mcpConfigPath,
     "--tools",
-    "",
+    imagePaths.length ? "Read" : "",
     "--allowedTools",
-    ALLOWED_TOOLS.join(","),
+    allowed.join(","),
     "--disallowedTools",
     DISALLOWED_TOOLS.join(","),
     "--permission-mode",
@@ -67,8 +98,24 @@ export function buildArgs(question: string, mcpConfigPath: string): string[] {
     AGENT_SYSTEM_PROMPT,
     // after "--" the question is a positional prompt, never parsed as a flag
     "--",
-    question,
+    promptWithImages(question, imagePaths),
   ];
+}
+
+const B64 = /^[A-Za-z0-9+/]*={0,2}$/;
+
+/** Decode and check one attachment; the bytes and the type they really are. Throws a 400 AgentError. */
+export function decodeImage(img: AskImage, i: number): { bytes: Buffer; ext: string } {
+  const label = `Image ${i + 1}${img && typeof img.name === "string" && img.name ? ` (${img.name.slice(0, 60)})` : ""}`;
+  const data = img && typeof img.data === "string" ? img.data.replace(/\s+/g, "") : "";
+  if (!data) throw new AgentError(`${label} is empty.`, 400);
+  if (data.length > MAX_ASK_IMAGE_B64 + 4) throw new AgentError(`${label} is larger than 5 MB.`, 400);
+  if (data.length % 4 !== 0 || !B64.test(data)) throw new AgentError(`${label} is not valid base64.`, 400);
+  const bytes = Buffer.from(data, "base64");
+  if (bytes.length > MAX_ASK_IMAGE_BYTES) throw new AgentError(`${label} is larger than 5 MB.`, 400);
+  const type = sniffImageType(bytes);
+  if (!type) throw new AgentError(`${label} is not a PNG, JPEG, WebP or GIF image.`, 400);
+  return { bytes, ext: ASK_IMAGE_EXT[type] };
 }
 
 export class AgentError extends Error {
@@ -157,13 +204,19 @@ export function buildMcpConfig(ownerEmail: string) {
 export async function askAgent(
   question: string,
   ownerEmail: string | undefined,
+  images: AskImage[] = [],
 ): Promise<{ answer: string; layoutChanged: boolean }> {
   const q = question.trim();
   if (!q) throw new AgentError("Ask a question first.", 400);
   if (q.length > 2000) throw new AgentError("Questions are limited to 2000 characters.", 400);
   if (!ownerEmail) throw new AgentError("No signed-in user for this request.", 400);
+  if (!Array.isArray(images)) throw new AgentError("images must be a list.", 400);
+  if (images.length > MAX_ASK_IMAGES) throw new AgentError(`At most ${MAX_ASK_IMAGES} images.`, 400);
+  // every image is checked before anything is written or spawned
+  const decoded = images.map(decodeImage);
   if (busy) throw new AgentError("The agent is already answering a question; try again when it finishes.", 409);
   busy = true;
+  const imagePaths: string[] = [];
   const started = Date.now();
   const dir = dataDir();
   let exit: number | null = null;
@@ -176,8 +229,17 @@ export async function askAgent(
     // an empty working directory outside any repo: no project settings, hooks or CLAUDE.md ride along
     const cwd = path.join(os.tmpdir(), "cockpit-agent-cwd");
     await mkdir(cwd, { recursive: true });
+    if (decoded.length) {
+      const imgDir = path.join(dir, "images");
+      await mkdir(imgDir, { recursive: true, mode: 0o700 });
+      for (const d of decoded) {
+        const p = path.join(imgDir, `${randomBytes(16).toString("hex")}.${d.ext}`);
+        imagePaths.push(p); // pushed first, so a failed write is still cleaned up
+        await writeFile(p, d.bytes, { mode: 0o600, flag: "wx" });
+      }
+    }
     const before = JSON.stringify(await readLayout());
-    const r = await runCli(buildArgs(q, cfg), cwd);
+    const r = await runCli(buildArgs(q, cfg, imagePaths), cwd);
     exit = r.code;
     layoutChanged = JSON.stringify(await readLayout()) !== before;
     if (r.spawnError) throw new AgentError(r.spawnError);
@@ -197,8 +259,18 @@ export async function askAgent(
     error = e instanceof Error ? e.message : String(e);
     throw e instanceof AgentError ? e : new AgentError(error);
   } finally {
+    // the attachments live only for the run: removed on success, error and timeout alike
+    await Promise.all(imagePaths.map((p) => rm(p, { force: true }).catch(() => {})));
     busy = false;
-    const line = JSON.stringify({ time: new Date().toISOString(), question: q, exit, layoutChanged, ms: Date.now() - started, ...(error ? { error } : {}) });
+    const line = JSON.stringify({
+      time: new Date().toISOString(),
+      question: q,
+      images: imagePaths.length,
+      exit,
+      layoutChanged,
+      ms: Date.now() - started,
+      ...(error ? { error } : {}),
+    });
     await appendFile(path.join(dir, "ask-agent.log"), line + "\n").catch(() => {});
   }
 }

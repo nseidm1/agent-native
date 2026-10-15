@@ -6,7 +6,9 @@ import { readFileSync, mkdtempSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 
-import { ALLOWED_TOOLS, askAgent, buildArgs, buildMcpConfig, isLoopbackAddress } from "./agent";
+import { existsSync, readdirSync } from "node:fs";
+
+import { ALLOWED_TOOLS, askAgent, buildArgs, buildMcpConfig, decodeImage, isLoopbackAddress, readRuleFor } from "./agent";
 
 describe("ask-agent bounds", () => {
   it("accepts loopback addresses only", () => {
@@ -43,6 +45,51 @@ describe("ask-agent bounds", () => {
     const log = JSON.parse(readFileSync(path.join(dir, "ask-agent.log"), "utf8").trim());
     expect(log).toMatchObject({ question: "move halo", exit: null, layoutChanged: false });
     await expect(askAgent("x".repeat(2001), "dev@local.test")).rejects.toThrow(/2000 characters/);
+    delete process.env.COCKPIT_DATA_DIR;
+    delete process.env.COCKPIT_CLAUDE_BIN;
+  });
+
+  it("adds Read for exactly the attached image paths, and only when there are some", () => {
+    const none = buildArgs("hi", "/x/mcp.json");
+    expect(none[none.indexOf("--tools") + 1]).toBe("");
+    const p = "/data/cockpit-agent/images/0123abcd.png";
+    const args = buildArgs("what colour?", "/x/mcp.json", [p]);
+    expect(args[args.indexOf("--tools") + 1]).toBe("Read");
+    expect(args[args.indexOf("--allowedTools") + 1]).toBe([...ALLOWED_TOOLS, `Read(/${p})`].join(","));
+    expect(args[args.length - 1]).toBe(`what colour?\n\nAttached images: ${p} - view them with the Read tool.`);
+    // a path that could widen the rule is refused, never allow-listed
+    for (const bad of ["/a/*.png", "/a/(x).png", "/a/b c.png", "/a/../etc/passwd", "relative.png", "/a/x,Bash.png"]) {
+      expect(() => readRuleFor(bad)).toThrow(/not safe/);
+    }
+  });
+
+  it("checks each image by magic bytes and size before anything is written", () => {
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3]);
+    expect(decodeImage({ name: "a.png", data: png.toString("base64") }, 0).ext).toBe("png");
+    expect(() => decodeImage({ name: "a.png", data: Buffer.from("not an image at all").toString("base64") }, 0)).toThrow(
+      /not a PNG, JPEG, WebP or GIF/,
+    );
+    expect(() => decodeImage({ name: "a.png", data: "@@@@" }, 0)).toThrow(/not valid base64/);
+    expect(() => decodeImage({ name: "a.png", data: "" }, 0)).toThrow(/empty/);
+    const big = Buffer.alloc(6 * 1024 * 1024);
+    png.copy(big);
+    expect(() => decodeImage({ name: "big.png", data: big.toString("base64") }, 0)).toThrow(/larger than 5 MB/);
+  });
+
+  it("refuses a bad image without spawning, and deletes attachments after a failed run", async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), "cockpit-agent-img-"));
+    process.env.COCKPIT_DATA_DIR = dir;
+    process.env.COCKPIT_CLAUDE_BIN = path.join(dir, "no-such-claude");
+    await expect(askAgent("colour?", "dev@local.test", [{ name: "x.txt", data: Buffer.from("hello").toString("base64") }])).rejects.toThrow(
+      /not a PNG/,
+    );
+    expect(existsSync(path.join(dir, "ask-agent.log"))).toBe(false); // refused before the run began
+    const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]).toString("base64");
+    await expect(askAgent("colour?", "dev@local.test", [{ name: "a.png", data: png }])).rejects.toThrow(/Claude CLI not found/);
+    expect(readdirSync(path.join(dir, "images"))).toEqual([]);
+    const log = JSON.parse(readFileSync(path.join(dir, "ask-agent.log"), "utf8").trim());
+    expect(log).toMatchObject({ question: "colour?", images: 1 });
+    await expect(askAgent("x", "dev@local.test", Array(4).fill({ name: "a.png", data: png }))).rejects.toThrow(/At most 3/);
     delete process.env.COCKPIT_DATA_DIR;
     delete process.env.COCKPIT_CLAUDE_BIN;
   });

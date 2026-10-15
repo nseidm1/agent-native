@@ -11,6 +11,7 @@ import {
   DEFAULT_LAYOUT,
   type Tone,
 } from "@shared/cockpit";
+import { type AskImage, MAX_ASK_IMAGES, precheckImageFile, sniffImageType } from "@shared/ask-images";
 
 const GLYPH: Record<Tone, string> = { g: "✓", a: "⚠", r: "✕", d: "–" };
 const TONE_WORD: Record<Tone, string> = { g: "ok", a: "needs attention", r: "broken", d: "no data" };
@@ -102,32 +103,111 @@ function readCollapsed(): Record<string, boolean> {
   }
 }
 
+interface Attached extends AskImage {
+  id: string;
+  url: string;
+  size: number;
+}
+
+/** Reads one picked, pasted or dropped file into an attachment, or says why it cannot be one. */
+function readImageFile(f: File): Promise<Attached> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onerror = () => reject(new Error(`Could not read ${f.name || "the image"}.`));
+    r.onload = () => {
+      const url = String(r.result || "");
+      const data = url.slice(url.indexOf(",") + 1);
+      let head: Uint8Array;
+      try {
+        const bin = atob(data.slice(0, 24));
+        head = Uint8Array.from(bin, (c) => c.charCodeAt(0));
+      } catch {
+        head = new Uint8Array();
+      }
+      // the bytes, not the declared type, decide (the server checks again)
+      if (!sniffImageType(head)) return reject(new Error(`${f.name || "That file"} is not a PNG, JPEG, WebP or GIF image.`));
+      resolve({ id: Math.random().toString(36).slice(2), name: (f.name || "pasted image").slice(0, 200), data, url, size: f.size });
+    };
+    r.readAsDataURL(f);
+  });
+}
+
+const kb = (n: number) => (n < 1024 * 1024 ? Math.max(1, Math.round(n / 1024)) + " KB" : (n / 1024 / 1024).toFixed(1) + " MB");
+
 function AskPanel({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
   const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState<{ text: string; changed: boolean } | null>(null);
+  const [images, setImages] = useState<Attached[]>([]);
+  const [attachErr, setAttachErr] = useState("");
+  const [dragging, setDragging] = useState(false);
+  const [answer, setAnswer] = useState<{ text: string; changed: boolean; images: number } | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
-  const ask = useActionMutation<{ answer: string; layoutChanged: boolean }, { question: string }>("ask-agent", {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const imagesRef = useRef<Attached[]>([]);
+  imagesRef.current = images;
+  const ask = useActionMutation<{ answer: string; layoutChanged: boolean }, { question: string; images?: AskImage[] }>("ask-agent", {
     timeoutMs: 135_000,
-    onSuccess: (r) => {
-      setAnswer({ text: r.answer, changed: r.layoutChanged });
+    onSuccess: (r, vars) => {
+      setAnswer({ text: r.answer, changed: r.layoutChanged, images: vars.images?.length ?? 0 });
+      setImages([]);
       void qc.invalidateQueries();
     },
   });
   useEffect(() => ref.current?.focus(), []);
+
+  const addFiles = async (files: File[]) => {
+    setAttachErr("");
+    const errs: string[] = [];
+    let count = imagesRef.current.length;
+    const added: Attached[] = [];
+    for (const f of files) {
+      const why = precheckImageFile(f, count);
+      if (why) {
+        errs.push(f.name ? `${f.name}: ${why}` : why);
+        if (count >= MAX_ASK_IMAGES) break;
+        continue;
+      }
+      try {
+        added.push(await readImageFile(f));
+        count++;
+      } catch (e) {
+        errs.push(e instanceof Error ? e.message : String(e));
+      }
+    }
+    if (added.length) setImages((prev) => [...prev, ...added].slice(0, MAX_ASK_IMAGES));
+    if (errs.length) setAttachErr(errs.join(" "));
+  };
+
   const send = () => {
     const q = question.trim();
     if (!q || ask.isPending) return;
     setAnswer(null);
-    ask.mutate({ question: q });
+    const imgs = images.map(({ name, data }) => ({ name, data }));
+    ask.mutate(imgs.length ? { question: q, images: imgs } : { question: q });
   };
+  const full = images.length >= MAX_ASK_IMAGES;
   return (
     <div
-      className="cp-ask"
+      className={"cp-ask" + (dragging ? " drop" : "")}
       role="dialog"
       aria-label="Ask the cockpit agent"
       onKeyDown={(e) => {
         if (e.key === "Escape") onClose();
+      }}
+      onDragOver={(e) => {
+        if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "copy";
+        setDragging(true);
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) setDragging(false);
+      }}
+      onDrop={(e) => {
+        if (!e.dataTransfer.files.length) return;
+        e.preventDefault();
+        setDragging(false);
+        void addFiles(Array.from(e.dataTransfer.files));
       }}
     >
       <label htmlFor="cp-ask-q">Ask the agent to read or rearrange these cards</label>
@@ -140,6 +220,12 @@ function AskPanel({ onClose }: { onClose: () => void }) {
           value={question}
           placeholder="e.g. move Halo to the top of Models & compute"
           onChange={(e) => setQuestion(e.target.value)}
+          onPaste={(e) => {
+            const files = Array.from(e.clipboardData.files || []).filter((f) => f.type.startsWith("image/"));
+            if (!files.length) return;
+            e.preventDefault();
+            void addFiles(files);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -147,10 +233,70 @@ function AskPanel({ onClose }: { onClose: () => void }) {
             }
           }}
         />
+        <button
+          type="button"
+          className="cp-btn cp-attach"
+          onClick={() => fileRef.current?.click()}
+          disabled={full || ask.isPending}
+          aria-label={full ? `Image limit reached (${MAX_ASK_IMAGES})` : "Attach images"}
+          title={full ? `At most ${MAX_ASK_IMAGES} images` : "Attach images (or paste / drop them here)"}
+        >
+          <svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true">
+            <path
+              d="M21 11.5 12.4 20a5.5 5.5 0 0 1-7.8-7.8l8.6-8.5a3.7 3.7 0 0 1 5.2 5.2l-8.6 8.5a1.8 1.8 0 0 1-2.6-2.6l7.9-7.8"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp,image/gif"
+          multiple
+          hidden
+          data-testid="ask-file"
+          onChange={(e) => {
+            const files = Array.from(e.target.files || []);
+            e.target.value = "";
+            void addFiles(files);
+          }}
+        />
         <button type="button" className="cp-btn" onClick={send} disabled={ask.isPending || !question.trim()}>
           {ask.isPending ? "Asking…" : "Send"}
         </button>
       </div>
+      {images.length ? (
+        <ul className="cp-thumbs" aria-label={`${images.length} of ${MAX_ASK_IMAGES} images attached`}>
+          {images.map((img) => (
+            <li key={img.id} className="cp-thumb">
+              <img src={img.url} alt={img.name} />
+              <span className="cp-thumb-cap">{kb(img.size)}</span>
+              <button
+                type="button"
+                className="cp-thumb-x"
+                aria-label={`Remove ${img.name}`}
+                title={`Remove ${img.name}`}
+                disabled={ask.isPending}
+                onClick={() => setImages((prev) => prev.filter((x) => x.id !== img.id))}
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+      <div className="cp-ask-hint">
+        {dragging ? "Drop to attach" : `Images: attach, paste or drop · up to ${MAX_ASK_IMAGES}, 5 MB each, PNG/JPEG/WebP/GIF`}
+      </div>
+      {attachErr ? (
+        <div className="cp-ask-out err" role="alert">
+          {attachErr}
+        </div>
+      ) : null}
       {ask.isPending ? (
         <div className="cp-ask-out busy" aria-live="polite">
           The agent is working (up to 2 minutes)…
@@ -164,7 +310,10 @@ function AskPanel({ onClose }: { onClose: () => void }) {
           <div className="cp-ask-out" aria-live="polite">
             {answer.text}
           </div>
-          <div className="cp-ask-meta">{answer.changed ? "Layout changed." : "Layout unchanged."}</div>
+          <div className="cp-ask-meta">
+            {answer.changed ? "Layout changed." : "Layout unchanged."}
+            {answer.images ? ` ${answer.images} image${answer.images === 1 ? "" : "s"} sent.` : ""}
+          </div>
         </>
       ) : null}
     </div>
