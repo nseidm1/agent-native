@@ -4,7 +4,10 @@ import overview from "./overview.mjs";
 import account from "./account.mjs";
 import master from "./master.mjs";
 import phone from "./phone.mjs";
+import balancer from "./balancer.mjs";
+import halosave from "./halosave.mjs";
+import jev from "./jev.mjs";
 import push from "./push.mjs";
 import queue from "./queue.mjs";
 
-export const WINDOWS = [push, overview, agents, queue, account, master, phone];
+export const WINDOWS = [push, overview, agents, queue, account, master, phone, jev, halosave, balancer];

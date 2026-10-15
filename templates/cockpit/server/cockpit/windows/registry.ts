@@ -17,6 +17,9 @@ const BUILDERS: Partial<Record<WindowId, () => Promise<WindowBuilder>>> = {
   account: () => import("./account.js").then((m) => m.default),
   master: () => import("./master.js").then((m) => m.default),
   phone: () => import("./phone.js").then((m) => m.default),
+  jev: () => import("./jev.js").then((m) => m.default),
+  halosave: () => import("./halosave.js").then((m) => m.default),
+  balancer: () => import("./balancer.js").then((m) => m.default),
 };
 
 /** The ids with a builder: the page renders these natively, the rest still open the legacy window. */
