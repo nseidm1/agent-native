@@ -300,7 +300,7 @@ export function linkDeps(P: ApplyPaths, wt: string): void {
 /** The prompt the code agent gets: the request, the attachments, the scope it is held to. */
 export function buildAgentPrompt(question: string, imageNames: string[]): string {
   return [
-    "You are changing the FRONTEND of the cockpit card region: the React app under app/ in this checkout (templates/cockpit of the agent-native fork). The console asked, verbatim:",
+    "You are changing the FRONTEND of the cockpit: the React app under app/ in this checkout (templates/cockpit of the agent-native fork). It serves the card region at /cards/ (app/components/cockpit/CardRegion.tsx) and the whole front-facing cockpit at /cards/cockpit (Cockpit.tsx: TopBar.tsx, Home.tsx with OfficeCard.tsx and the key-number tiles, and the card region). Find the component the request names and change that one. The console asked, verbatim:",
     "",
     `"${question}"`,
     "",
@@ -313,7 +313,7 @@ export function buildAgentPrompt(question: string, imageNames: string[]): string
     "- no fetch, XHR, WebSocket or EventSource, no absolute URL, no API path or port, no route loader or action, no node builtin, no process.env, no eval.",
     "- .ask-context/resources.json lists every field each resource answers right now, as a path inside cockpit-read's data with a sample value. Bind only to fields listed there. A value the request needs that exists nowhere is shown as \"no data\" and said so in your answer; never invent a number.",
     "- If the request cannot be done in the frontend at all (it needs a new data field or action, or any system behaviour), change nothing and make the first line of your final answer: NEEDS_SYSTEM: <one sentence naming what is missing>.",
-    "HOW: read app/components/cockpit/CardRegion.tsx, app/global.css and DESIGN.md first and match the region's neon theme. Keep every existing card and behaviour working. It must look excellent at 1280 px and at 390 px wide (no sideways scroll), with accessible labels. TypeScript must stay clean: typecheck, the unit tests, a build and a Playwright check run after you, and any failure discards the change. Do not run git.",
+    "HOW: read the component you change, its stylesheet (app/global.css for the region, app/cockpit-full.css for the cockpit page) and DESIGN.md first, and match the neon theme. Keep every existing card and behaviour working. It must look excellent at 1280 px and at 390 px wide (no sideways scroll), with accessible labels. TypeScript must stay clean: typecheck, the unit tests, a build and a Playwright check run after you, and any failure discards the change. Do not run git.",
     "FINAL ANSWER: one or two plain sentences saying what you changed and which live fields it shows; the console reads it as the reply.",
   ].join("\n");
 }
@@ -351,6 +351,14 @@ export async function runApply(P: ApplyPaths, j: ApplyJob, input: ApplyInput, de
       const dirty = must(await git(["status", "--porcelain=v1", "--untracked-files=no", "--", APP_REL]), "git status").trim();
       if (dirty) throw new GateError("the live checkout has uncommitted changes in " + APP_REL + ", so a change could not go live cleanly: " + dirty.split("\n").slice(0, 5).join("; "));
       mkdirSync(P.wtRoot, { recursive: true });
+      // one job runs at a time, so any other ask worktree is left from a server that stopped mid-job: reap it
+      for (const old of readdirSync(P.wtRoot)) {
+        if (old === j.id || !/^ask-/.test(old)) continue;
+        await git(["worktree", "remove", "--force", path.join(P.wtRoot, old)]);
+        rmSync(path.join(P.wtRoot, old), { recursive: true, force: true });
+        await git(["branch", "-D", "ask/" + old]);
+      }
+      await git(["worktree", "prune"]);
       must(await git(["worktree", "add", "-b", branch, wt, j.base]), "git worktree add");
       const ctx = path.join(wtApp, ".ask-context");
       mkdirSync(ctx, { recursive: true });

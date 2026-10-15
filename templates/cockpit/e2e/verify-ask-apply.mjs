@@ -15,7 +15,7 @@
  *   node e2e/verify-ask-apply.mjs --phase undo --out <dir>
  */
 import { execFileSync } from "node:child_process";
-import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -135,6 +135,25 @@ try {
     await phone.page.screenshot({ path: path.join(out, "after-390.png"), fullPage: true });
     await noSideways(phone.page, 390);
     await phone.ctx.close();
+    // the whole cockpit (FA-19087) and, when it has one, its office card on its own
+    for (const [w, h] of [
+      [1280, 900],
+      [390, 844],
+    ]) {
+      const ctx = await browser.newContext({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
+      const p = await ctx.newPage();
+      p.on("console", (m) => {
+        if (m.type() === "error") noteError(`cockpit ${w}: ${m.text().slice(0, 160)} @ ${(m.location()?.url || "").replace(base, "")}`);
+      });
+      await p.goto(base + "/cards/cockpit", { waitUntil: "domcontentloaded" });
+      await p.waitForSelector('[data-testid="cockpit-full"]', { timeout: 30_000 });
+      await p.waitForTimeout(4000);
+      await p.screenshot({ path: path.join(out, `after-cockpit-${w}.png`), fullPage: true });
+      const office = p.locator('[data-testid="cf-office"]');
+      if (await office.count()) await office.first().screenshot({ path: path.join(out, `after-office-${w}.png`) });
+      await noSideways(p, "cockpit " + w);
+      await ctx.close();
+    }
     check("the fork moved by the applied commit", git("rev-parse", "HEAD") !== base0, git("log", "--oneline", "-1"));
     // side by side with the mockup
     if (image) {
@@ -143,7 +162,7 @@ try {
       const b64 = (f) => "data:image/png;base64," + readFileSync(f).toString("base64");
       await p.setContent(`<body style="margin:0;background:#03070f;display:flex;gap:24px;padding:24px;align-items:flex-start;font:14px sans-serif;color:#8fdcff">
         <figure style="margin:0;width:1168px"><figcaption>Mockup (console's attachment)</figcaption><img style="width:100%" src="${b64(image)}"></figure>
-        <figure style="margin:0;width:1240px"><figcaption>Live region after the Ask agent applied it (1280)</figcaption><img style="width:100%" src="${b64(path.join(out, "after-1280.png"))}"></figure></body>`);
+        <figure style="margin:0;width:1240px"><figcaption>Live after the Ask agent applied it (1280)</figcaption><img style="width:100%" src="${b64(existsSync(path.join(out, "after-office-1280.png")) ? path.join(out, "after-office-1280.png") : path.join(out, "after-1280.png"))}"></figure></body>`);
       await p.waitForTimeout(500);
       await p.screenshot({ path: path.join(out, "side-by-side.png"), fullPage: true });
       await ctx.close();
