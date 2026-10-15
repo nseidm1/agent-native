@@ -116,9 +116,21 @@ export interface ExecResult {
 }
 export type Exec = (cmd: string, args: string[], o: { cwd: string; env?: NodeJS.ProcessEnv; timeoutMs?: number }) => Promise<ExecResult>;
 
-/** Node 22 first on PATH (the gates and the CLI they start), then the Mac's Claude CLI. */
+/** The environment this server started with (server/plugins/00-local-database.ts keeps it before adding its own). */
+export function bootEnv(): NodeJS.ProcessEnv {
+  const g = globalThis as { __cockpitBootEnv?: NodeJS.ProcessEnv };
+  const env = { ...(g.__cockpitBootEnv ?? process.env) };
+  if (!g.__cockpitBootEnv) {
+    // no snapshot (a test): never hand a child the values this server sets for itself
+    delete env.BETTER_AUTH_SECRET;
+    if (/^pglite:/.test(env.DATABASE_URL || "")) delete env.DATABASE_URL;
+  }
+  return env;
+}
+
+/** The boot environment, Node 22 first on PATH (the gates and the CLI they start), then the Mac's Claude CLI. */
 export function childEnv(extra: NodeJS.ProcessEnv = {}): NodeJS.ProcessEnv {
-  const env = { ...process.env, ...extra };
+  const env = { ...bootEnv(), ...extra };
   delete env.ANTHROPIC_API_KEY;
   delete env.ANTHROPIC_AUTH_TOKEN;
   delete env.CLAUDECODE;

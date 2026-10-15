@@ -21,14 +21,14 @@ import path from "node:path";
 
 import { dataDir } from "../agent.js";
 import { get, manifest } from "../client.js";
-import { type ApplyDeps, type ApplyPaths, childEnv, exec, waitHttp } from "./job.js";
+import { type ApplyDeps, type ApplyPaths, bootEnv, childEnv, exec, waitHttp } from "./job.js";
 
 export const applyModel = () => process.env.COCKPIT_APPLY_MODEL || "claude-opus-5-5";
 
 async function runCodeAgent(o: { cwd: string; prompt: string; title: string }): Promise<{ ok: boolean; message: string; runId?: string }> {
   // the upstream store and the CLI the executor starts: this app's data dir, Node 22 and ~/.local/bin on PATH
   process.env.AGENT_NATIVE_CODE_AGENTS_HOME = path.join(dataDir(), "code-agents");
-  process.env.PATH = childEnv().PATH;
+  process.env.PATH = childEnv().PATH; // guard:allow-env-mutation — the upstream executor reads PATH and the store root from process.env
   const CA = await import("@agent-native/core/code-agents");
   const run = CA.createCodeAgentRunRecord({
     goalId: "cockpit-ask",
@@ -120,7 +120,8 @@ function restart(P: ApplyPaths) {
     const child = spawn(
       P.node,
       [path.join(P.appDir, "scripts", "restart-region.mjs"), "--pid", String(process.pid), "--out", path.join(P.jobsDir, jobId + ".restart.json"), "--app", P.appDir],
-      { cwd: P.appDir, env: process.env, detached: true, stdio: ["ignore", out, out] },
+      // the boot environment: the restarted region configures its own database and auth secret, as this one did
+      { cwd: P.appDir, env: bootEnv(), detached: true, stdio: ["ignore", out, out] },
     );
     child.unref();
   };

@@ -19,6 +19,11 @@ import { configureAgentNativeEmbeddedEnvironment } from "@agent-native/core/serv
  * Anything configured in the environment is left alone.
  */
 export default function localRuntime() {
+  // FA-19080: the environment this server was started with, before the lines below add DATABASE_URL and
+  // BETTER_AUTH_SECRET. A process this server starts (an Ask change's gate server, the restarted region) gets this
+  // copy, so it configures itself the same way instead of inheriting a PGlite URL its own guard refuses as "hosted".
+  const g = globalThis as { __cockpitBootEnv?: NodeJS.ProcessEnv };
+  g.__cockpitBootEnv ??= { ...process.env };
   if (!process.env.DATABASE_URL) {
     configureAgentNativeEmbeddedEnvironment({ databaseUrl: "pglite:./data/pglite" });
   }
