@@ -96,15 +96,18 @@ async function boardSearch(page, frame, label, id) {
   await dlg.waitFor({ state: "visible", timeout: 15_000 });
   const search = dlg.locator('[data-testid="detail-search"]');
   await search.waitFor({ state: "visible", timeout: 20_000 });
-  await dlg.locator(".cp-tbl tbody tr:not(.cp-xr)").first().waitFor({ timeout: 20_000 });
-  const rowsBefore = await dlg.locator(".cp-tbl tbody tr:not(.cp-xr)").count();
-  const target = id || (await dlg.locator(".cp-tbl tbody tr:not(.cp-xr) td.first").first().innerText()).trim();
+  // FA-19027: the Board dialog is the whole board (columns of card faces) read from the cockpit client
+  const ROWS = '[data-testid="board-card"]';
+  const FA = '[data-testid="board-card"] .cp-bc-fa';
+  await dlg.locator(ROWS).first().waitFor({ timeout: 20_000 });
+  const rowsBefore = await dlg.locator(ROWS).count();
+  const target = id || (await dlg.locator(FA).first().innerText()).trim();
   await search.fill(target);
-  // a card filed a moment ago reaches the dialog on its next read of the cockpit state (the dialog refetches every 5 s)
+  // a card filed a moment ago reaches the dialog on the client's next change event
   await frame
     .waitForFunction(() => /card/.test(document.querySelector('[data-testid="detail-search-count"]')?.textContent || ""), null, { timeout: 30_000 })
     .catch(() => {});
-  const firsts = await dlg.locator(".cp-tbl tbody tr:not(.cp-xr) td.first").allInnerTexts();
+  const firsts = await dlg.locator(FA).allInnerTexts();
   const count = await dlg.locator('[data-testid="detail-search-count"]').innerText();
   check(`${label}: Board dialog has a search field`, true, `placeholder "${await search.getAttribute("placeholder")}"`);
   check(`${label}: typing ${target} narrows the list`, firsts.length >= 1 && firsts.length < rowsBefore && firsts.every((t) => t.trim() === target), `${rowsBefore} rows -> ${firsts.length} (${count}): ${firsts.slice(0, 3).join(", ")}`);
@@ -113,7 +116,7 @@ async function boardSearch(page, frame, label, id) {
   await search.fill("zz-no-such-card-zz");
   check(`${label}: a query with no match says so`, (await dlg.locator('[data-testid="detail-search-count"]').innerText()) === "no match");
   await search.fill("");
-  check(`${label}: clearing the search brings every row back`, (await dlg.locator(".cp-tbl tbody tr:not(.cp-xr)").count()) === rowsBefore);
+  check(`${label}: clearing the search brings every row back`, (await dlg.locator(ROWS).count()) === rowsBefore);
   await dlg.getByRole("button", { name: "Close", exact: true }).click();
   return target;
 }
