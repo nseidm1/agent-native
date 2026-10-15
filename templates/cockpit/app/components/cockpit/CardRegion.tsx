@@ -14,9 +14,10 @@ import {
 import { AppliedBanner, ApplyProgress } from "./ApplyStatus";
 import { ensureUiCapability } from "@/lib/ui-capability";
 import { BoardDialog } from "./BoardDialog";
-import { CardDialog } from "./CardDialog";
+import { ActionButton, CardDialog } from "./CardDialog";
 import { useCanWrite } from "./viewer";
 import { type AskImage, MAX_ASK_IMAGES, precheckImageFile, sniffImageType } from "@shared/ask-images";
+import type { DetailAction } from "@shared/cockpit-detail";
 
 const GLYPH: Record<Tone, string> = { g: "✓", a: "⚠", r: "✕", d: "–" };
 const TONE_WORD: Record<Tone, string> = { g: "ok", a: "needs attention", r: "broken", d: "no data" };
@@ -130,7 +131,16 @@ function readImageFile(f: File): Promise<Attached> {
   });
 }
 
-type AskKind = "layout" | "read" | "change" | "system";
+type AskKind = "layout" | "read" | "change" | "system" | "board";
+type RoutePath = "layout" | "read" | "change" | "filed" | "board";
+/** FA-19087: one part of a split request and the path it finally ran on (more than one in trail: it escalated). */
+interface AskPartReply {
+  kind: AskKind;
+  path: RoutePath;
+  trail: RoutePath[];
+  text: string;
+  escalated?: string;
+}
 interface AskReply {
   answer: string;
   layoutChanged: boolean;
@@ -138,8 +148,12 @@ interface AskReply {
   classifyNote?: string;
   card?: { fa: string; title: string; attached: string; images: string[] };
   job?: { id: string; status: string };
+  parts?: AskPartReply[];
+  /** board card actions offered as one-tap confirms; the tap runs the dialog's own board card write */
+  offers?: DetailAction[];
 }
-const PATH_LABEL: Record<AskKind, string> = { layout: "Layout path", read: "Read path", change: "Applying change", system: "Filed (system side)" };
+const PATH_LABEL: Record<AskKind, string> = { layout: "Layout path", read: "Read path", change: "Applying change", system: "Filed (system side)", board: "Board action" };
+const TRAIL_WORD: Record<RoutePath, string> = { layout: "Layout", read: "Read", change: "Change", filed: "Filed", board: "Board action" };
 
 const kb = (n: number) => (n < 1024 * 1024 ? Math.max(1, Math.round(n / 1024)) + " KB" : (n / 1024 / 1024).toFixed(1) + " MB");
 
@@ -149,7 +163,17 @@ function AskPanel({ onClose }: { onClose: () => void }) {
   const [images, setImages] = useState<Attached[]>([]);
   const [attachErr, setAttachErr] = useState("");
   const [dragging, setDragging] = useState(false);
-  const [answer, setAnswer] = useState<{ text: string; changed: boolean; images: number; kind: AskKind; fa?: string; note?: string; job?: string } | null>(null);
+  const [answer, setAnswer] = useState<{
+    text: string;
+    changed: boolean;
+    images: number;
+    kind: AskKind;
+    fa?: string;
+    note?: string;
+    job?: string;
+    parts?: AskPartReply[];
+    offers?: DetailAction[];
+  } | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const imagesRef = useRef<Attached[]>([]);
@@ -160,7 +184,17 @@ function AskPanel({ onClose }: { onClose: () => void }) {
     // classifier (30 s) + the agent run (120 s) or the card filer (120 s)
     timeoutMs: 280_000,
     onSuccess: (r, vars) => {
-      setAnswer({ text: r.answer, changed: r.layoutChanged, images: vars.images?.length ?? 0, kind: r.kind, fa: r.card?.fa, note: r.classifyNote, job: r.job?.id });
+      setAnswer({
+        text: r.answer,
+        changed: r.layoutChanged,
+        images: vars.images?.length ?? 0,
+        kind: r.kind,
+        fa: r.card?.fa,
+        note: r.classifyNote,
+        job: r.job?.id,
+        parts: r.parts,
+        offers: r.offers,
+      });
       setImages([]);
       void qc.invalidateQueries();
     },
@@ -227,7 +261,7 @@ function AskPanel({ onClose }: { onClose: () => void }) {
         void addFiles(Array.from(e.dataTransfer.files));
       }}
     >
-      <label htmlFor="cp-ask-q">Ask the agent to read, rearrange or change these cards</label>
+      <label htmlFor="cp-ask-q">Ask the agent to read, rearrange or change the cockpit</label>
       <div className="cp-ask-row">
         <textarea
           id="cp-ask-q"
@@ -309,7 +343,7 @@ function AskPanel({ onClose }: { onClose: () => void }) {
       <div className="cp-ask-hint">
         {dragging
           ? "Drop to attach"
-          : `A change to this region is applied live by the code agent once scope, typecheck, tests, build and a Playwright check pass, with Undo after; a request that needs the system side is filed as a board card. Images: attach, paste or drop · up to ${MAX_ASK_IMAGES}, 5 MB each, PNG/JPEG/WebP/GIF`}
+          : `A change anywhere in the cockpit is applied live by the code agent once scope, typecheck, tests, build and a Playwright check pass, with Undo after; a card move the layout cannot express goes on to that path; a board action (cancel, pause, resume) is offered as a button; a request that needs the system side is filed as a board card. Images: attach, paste or drop · up to ${MAX_ASK_IMAGES}, 5 MB each, PNG/JPEG/WebP/GIF`}
       </div>
       {canApply ? null : (
         <div className="cp-ask-hint" data-testid="ask-unpaired">
@@ -334,16 +368,36 @@ function AskPanel({ onClose }: { onClose: () => void }) {
           <div className={"cp-ask-out" + (answer.fa ? " filed" : "")} aria-live="polite" data-testid="ask-answer" data-kind={answer.kind}>
             {answer.text}
           </div>
+          {answer.offers && answer.offers.length ? (
+            <div className="cp-acts cp-ask-offers" data-testid="ask-offers" aria-label="Board actions to confirm">
+              {answer.offers.map((o) => (
+                <ActionButton key={o.label} action={o} canWrite={canApply} onDone={() => void qc.invalidateQueries()} />
+              ))}
+            </div>
+          ) : null}
           {answer.job ? <ApplyProgress id={answer.job} onFollow={(id) => setAnswer((a) => (a ? { ...a, job: id } : a))} /> : null}
           <div className="cp-ask-meta" data-testid="ask-meta">
-            <span className={"cp-ask-path k-" + answer.kind}>{PATH_LABEL[answer.kind]}</span>
-            {answer.fa
-              ? ` Filed as ${answer.fa}; nothing in the cockpit was changed.`
-              : answer.job
-                ? " Applied only if every gate passes."
-                : answer.changed
-                  ? " Layout changed."
-                  : " Layout unchanged."}
+            {answer.parts && (answer.parts.length > 1 || answer.parts.some((p) => p.trail.length > 1)) ? (
+              <span className="cp-ask-parts" data-testid="ask-parts">
+                {answer.parts.map((p, i) => (
+                  <span key={i} className={"cp-ask-path k-" + (p.path === "filed" ? "system" : p.path)} title={p.escalated ? "Escalated: " + p.escalated : p.text}>
+                    {p.trail.map((t) => TRAIL_WORD[t]).join(" → ")}
+                  </span>
+                ))}
+              </span>
+            ) : (
+              <span className={"cp-ask-path k-" + answer.kind}>{PATH_LABEL[answer.kind]}</span>
+            )}
+            {answer.job
+              ? " Applied only if every gate passes."
+              : answer.fa
+                ? ` Filed as ${answer.fa}; nothing in the cockpit was changed.`
+                : answer.kind === "board"
+                  ? ""
+                  : answer.changed
+                    ? " Layout changed."
+                    : " Layout unchanged."}
+            {answer.offers && answer.offers.length ? (canApply ? " A board action runs only when you tap it." : "") : ""}
             {answer.images && answer.kind !== "change" ? ` ${answer.images} image${answer.images === 1 ? "" : "s"} sent.` : ""}
             {answer.note ? ` (Classifier unavailable, answered as a read: ${answer.note})` : ""}
           </div>

@@ -32,10 +32,12 @@ import {
   MAX_ASK_IMAGES,
   sniffImageType,
 } from "../../shared/ask-images.js";
-import { WRITE_ACTION_NAMES } from "../../shared/cockpit-detail.js";
+import { type DetailAction, WRITE_ACTION_NAMES } from "../../shared/cockpit-detail.js";
 import { type ApplyInput, type ApplyJob, applyPaths, startApply } from "./apply/job.js";
 import { liveDeps } from "./apply/runtime.js";
-import { type AskKind, type Classification, classify } from "./classify.js";
+import { appendRoute, type RoutePart, type RoutePath } from "./ask-routes.js";
+import { getBoardCard } from "./board.js";
+import { type AskPart, type BoardVerb, type Classification, classify, layoutExpressible, namedFas, type PartKind, partClassification } from "./classify.js";
 import { readLayout } from "./layout.js";
 import { buildRequestCard, faOfTitle, type FiledRequest, fileRequestCard, portfolioDir } from "./request-card.js";
 
@@ -64,7 +66,11 @@ export const DISALLOWED_TOOLS = [
 export const AGENT_SYSTEM_PROMPT =
   "You manage the cockpit card region. Read a card's full detail with get-card-detail, the whole board with get-board and one board card with get-board-card; " +
   "cockpit-manifest lists everything the cockpit offers and cockpit-read reads any of it. Change layout only through set-layout. " +
-  "Read get-layout before changing it, send the whole layout back with only the requested change, and answer in one or two short sentences.";
+  "Read get-layout before changing it, send the whole layout back with only the requested change, and answer in one or two short sentences. " +
+  // FA-19087 no dead ends: a request set-layout cannot express goes on to the change path (the gated code agent) instead of stopping here
+  `set-layout only reorders, hides, shows or sizes the 14 region cards, the same at every width. If the request needs anything else (another element, a placement for one width only, a restyle), do not call set-layout and make the first line of your answer exactly ${"CANNOT_LAYOUT"}: <one short reason>; the request then goes to the code agent.`;
+/** The first line a layout run answers when set-layout cannot express the request (FA-19087). */
+export const CANNOT_LAYOUT = /^\s*CANNOT_LAYOUT:\s*(.*)$/m;
 
 /** MI-388: appended for a viewer that may not change anything (an unpaired remote device). */
 export const READ_ONLY_VIEWER_PROMPT =
@@ -230,32 +236,66 @@ export function buildMcpConfig(ownerEmail: string) {
   };
 }
 
+export interface PartResult {
+  /** what the classifier called it */
+  kind: PartKind;
+  /** the path it finally ran on, and every path tried (more than one: it escalated) */
+  path: RoutePath;
+  trail: RoutePath[];
+  text: string;
+  /** this part's line of the reply */
+  answer: string;
+  /** why it escalated, when it did */
+  escalated?: string;
+}
+
 export interface AskResult {
   answer: string;
   layoutChanged: boolean;
-  /** Which path ran: layout and read are the agent run; change started an applied change (job); system filed a board card. */
-  kind: AskKind;
+  /** The path the request's main part finally ran on: layout or read (the agent run), change (an applied change, job), system (filed), board (an offered card action). */
+  kind: PartKind;
   /** The classifier's own note when it failed and the read path was used as the safe default. */
   classifyNote?: string;
   card?: FiledRequest;
   /** For an applied change: the background job the panel follows (get-ask-job) until it is live or reverted. */
   job?: { id: string; status: ApplyJob["status"] };
+  /** FA-19087: every part of the request and the path it took. */
+  parts: PartResult[];
+  /** Board card actions offered to a paired viewer as one-tap confirms (the existing cockpit-board-card-action write); the tap is the act. */
+  offers: DetailAction[];
 }
 
-/** Injectable for tests: the classifier, the filer and the apply starter. */
+/** Injectable for tests: the classifier, the filer, the apply starter and the card-title lookup. */
 export interface AskDeps {
-  classify?: (q: string) => Promise<Classification>;
+  classify?: (q: string, named?: { fa: string; title: string }[], images?: number) => Promise<Classification>;
   fileRequest?: typeof fileRequestCard;
   runAgent?: typeof runCli;
   apply?: (input: ApplyInput, cls: Classification) => ApplyJob;
-  /** false for a caller that is neither this Mac nor a paired phone (MI-388): a change is filed, never applied, and the layout is never moved. */
+  /** false for a caller that is neither this Mac nor a paired phone (MI-388): a change is filed, never applied, the layout is never moved, and a board action is not offered. */
   canApply?: boolean;
+  /** The title of each board card the request names (read through the cockpit client), so the classifier can resolve "it". */
+  cardTitles?: (fas: string[]) => Promise<{ fa: string; title: string }[]>;
 }
 
-/** A board card named in the request, or the one already filed for this same request (FA-18951's again path). */
-async function requestFa(q: string, cls: Classification): Promise<string | undefined> {
-  const named = /\bFA-\d{1,6}\b/.exec(q);
-  if (named) return named[0];
+const VERB_LABEL: Record<BoardVerb, string> = { archive: "Archive", pause: "Pause", resume: "Resume", backlog: "Backlog", promote: "Promote" };
+/** The one-tap confirm for a board part: the dialog's own board card write (cockpit-board-card-action, the cockpit's write gate behind it). */
+export function boardOffer(fa: string, action: BoardVerb): DetailAction {
+  return { kind: "board-card", label: `${VERB_LABEL[action]} ${fa}`, args: { fa, action }, ...(action === "archive" ? { danger: true } : {}) };
+}
+
+/** The live title lookup: at most 3 cards, 3 s, through the cockpit client; a miss is simply not named. */
+async function liveCardTitles(fas: string[]): Promise<{ fa: string; title: string }[]> {
+  const one = async (fa: string) => {
+    const r = await Promise.race([getBoardCard(fa), new Promise<null>((res) => setTimeout(() => res(null), 3000).unref())]);
+    return { fa, title: r && r.card ? String((r.card as { title?: unknown }).title || "") : "" };
+  };
+  return Promise.all(fas.slice(0, 3).map(one));
+}
+
+/** A board card named in the request (not one a board part acts on), or the one already filed for this same request (FA-18951's again path). */
+async function requestFa(q: string, cls: Classification, exclude: string[]): Promise<string | undefined> {
+  const named = [...q.matchAll(/\bFA-\d{1,6}\b/g)].map((m) => m[0]).find((f) => !exclude.includes(f));
+  if (named) return named;
   const t = buildRequestCard(q, cls, { at: "", images: 0 }).title;
   return (await faOfTitle(portfolioDir(), t)) ?? undefined;
 }
@@ -269,6 +309,9 @@ function liveApply(input: ApplyInput, cls: Classification): ApplyJob {
   };
   return startApply(P, input, liveDeps(P, fileSystemCard));
 }
+
+const PAIRING = "this Mac or a phone signed in with the board token";
+const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
 
 export async function askAgent(
   question: string,
@@ -286,74 +329,168 @@ export async function askAgent(
   const decoded = images.map(decodeImage);
   if (busy) throw new AgentError("The agent is already answering a question; try again when it finishes.", 409);
   busy = true;
+  const canApply = deps.canApply !== false;
   const imagePaths: string[] = [];
   const started = Date.now();
   const dir = dataDir();
   let exit: number | null = null;
   let layoutChanged = false;
   let error: string | undefined;
-  let kind: AskKind | undefined;
+  let cls: Classification | undefined;
   let filed: FiledRequest | undefined;
   let applied: string | undefined;
+  const results: (PartResult & { route: RoutePart; at: number })[] = [];
   try {
     await mkdir(dir, { recursive: true });
-    // 1. which path: a short tool-less CLI call; an unreadable answer falls back to read (the run that cannot change code)
-    const cls = await (deps.classify ?? classify)(q);
-    kind = cls.kind;
-    if (cls.kind === "change" && deps.canApply !== false) {
-      // 2a. a frontend change is APPLIED: agent-native's code agent edits a worktree, and it goes live only through the gates
-      const fa = await requestFa(q, cls).catch(() => undefined);
-      const title = cls.title || q.slice(0, 60);
-      const job = (deps.apply ?? liveApply)({ question: q, title, fa, images: decoded }, cls);
-      applied = job.id;
-      return {
-        answer: `Applying "${title}": the code agent is changing a copy of the region${decoded.length ? ` from your ${decoded.length === 1 ? "image" : decoded.length + " images"}` : ""}. It goes live only after the scope check, typecheck, tests, build and a Playwright check pass; otherwise nothing changes.`,
-        layoutChanged: false,
-        kind: "change",
-        job: { id: job.id, status: job.status },
-      };
+    // 1. which paths: the cards the request names (so "it" resolves), then a short tool-less CLI call that splits the request into parts
+    const fas = namedFas(q);
+    const lookup = deps.cardTitles ?? (deps.classify ? async () => [] : liveCardTitles);
+    const named = fas.length ? await lookup(fas).catch(() => []) : [];
+    cls = await (deps.classify ?? classify)(q, named, decoded.length);
+    const parts = cls.parts?.length ? cls.parts : [{ kind: cls.kind, text: q, title: cls.title, area: cls.area, width: "any" as const }];
+    const single = parts.filter((p) => p.kind !== "board").length <= 1;
+    const add = (p: AskPart, r: Omit<PartResult, "kind" | "text">, extra: Partial<RoutePart> = {}) =>
+      results.push({ kind: p.kind, text: p.text, ...r, at: parts.indexOf(p), route: { kind: p.kind, path: r.path, trail: r.trail, outcome: "", ...extra } });
+
+    // 2. board parts: offered as a one-tap confirm to a viewer who may write, never filed as a card about a card
+    const offers: DetailAction[] = [];
+    for (const p of parts.filter((x) => x.kind === "board" && x.fa && x.action)) {
+      const verb = p.action!;
+      if (canApply) {
+        offers.push(boardOffer(p.fa!, verb));
+        add(p, { path: "board", trail: ["board"], answer: `${VERB_LABEL[verb]} ${p.fa}: tap the button below to do it${verb === "archive" ? " (archiving hides the card; nothing is deleted)" : ""}.` }, { outcome: "offered", fa: p.fa, action: verb });
+      } else add(p, { path: "board", trail: ["board"], answer: `${VERB_LABEL[verb]} ${p.fa} needs a paired device (${PAIRING}); nothing was changed.` }, { outcome: "needs-pairing", fa: p.fa, action: verb });
     }
-    if (cls.kind === "change" || cls.kind === "system") {
-      // 2b. the system side, or a change asked from a remote device: filed as a board card with its images, never executed here
-      const why = cls.kind === "change" ? "asked from a device that is neither this Mac nor a paired phone, so the change was filed instead of applied" : "it needs the system side (data or an action the cockpit's client does not serve yet, or behaviour outside the card region)";
-      filed = await (deps.fileRequest ?? fileRequestCard)(q, cls, decoded, why);
-      const imgs = filed.attached === "board" ? ` ${filed.images.length} image${filed.images.length === 1 ? "" : "s"} attached to the card.` : filed.attached === "folder" ? ` Images saved and named on the card: ${filed.images.join(", ")}.` : "";
-      const head = filed.again ? `Already filed as ${filed.fa}: ${filed.title} (asked again; noted on the card, nothing new filed).` : `Filed ${filed.fa}: ${filed.title}.`;
-      const reason = cls.kind === "change" ? " Changes apply from this Mac or a phone signed in with the board token; from this device it was filed instead." : " It needs the system side, so it was filed rather than applied.";
-      return { answer: head + reason + imgs, layoutChanged: false, kind: cls.kind, card: filed };
+
+    // 3. no dead ends: a layout part set-layout cannot express goes to the change path before the run
+    const toChange: { p: AskPart; from?: RoutePath; why?: string }[] = parts.filter((p) => p.kind === "change").map((p) => ({ p }));
+    const agentParts: AskPart[] = [];
+    for (const p of parts) {
+      if (p.kind === "read") agentParts.push(p);
+      if (p.kind !== "layout") continue;
+      const v = layoutExpressible(p);
+      if (v.ok) agentParts.push(p);
+      else toChange.push({ p, from: "layout", why: v.why });
     }
-    // 2b. layout and read: today's agent run, four region tools and nothing else
-    const cfg = path.join(dir, "mcp-config.json");
-    await writeFile(cfg, JSON.stringify(buildMcpConfig(ownerEmail), null, 2));
-    // an empty working directory outside any repo: no project settings, hooks or CLAUDE.md ride along
-    const cwd = path.join(os.tmpdir(), "cockpit-agent-cwd");
-    await mkdir(cwd, { recursive: true });
-    if (decoded.length) {
-      const imgDir = path.join(dir, "images");
-      await mkdir(imgDir, { recursive: true, mode: 0o700 });
-      for (const d of decoded) {
-        const p = path.join(imgDir, `${randomBytes(16).toString("hex")}.${d.ext}`);
-        imagePaths.push(p); // pushed first, so a failed write is still cleaned up
-        await writeFile(p, d.bytes, { mode: 0o600, flag: "wx" });
+    const systemParts = parts.filter((p) => p.kind === "system");
+
+    // 4. layout and read: the agent run, the region tools and nothing else
+    if (agentParts.length) {
+      const cfg = path.join(dir, "mcp-config.json");
+      await writeFile(cfg, JSON.stringify(buildMcpConfig(ownerEmail), null, 2));
+      // an empty working directory outside any repo: no project settings, hooks or CLAUDE.md ride along
+      const cwd = path.join(os.tmpdir(), "cockpit-agent-cwd");
+      await mkdir(cwd, { recursive: true });
+      // the images go with the change or the filed card when there is one; otherwise this run reads them
+      if (decoded.length && !toChange.length && !systemParts.length) {
+        const imgDir = path.join(dir, "images");
+        await mkdir(imgDir, { recursive: true, mode: 0o700 });
+        for (const d of decoded) {
+          const p = path.join(imgDir, `${randomBytes(16).toString("hex")}.${d.ext}`);
+          imagePaths.push(p); // pushed first, so a failed write is still cleaned up
+          await writeFile(p, d.bytes, { mode: 0o600, flag: "wx" });
+        }
+      }
+      const askText = single && agentParts.length === parts.length ? q : agentParts.map((p) => p.text).join(" ");
+      const before = JSON.stringify(await readLayout());
+      let answer = "";
+      try {
+        const r = await (deps.runAgent ?? runCli)(buildArgs(askText, cfg, imagePaths, { layoutWrites: canApply }), cwd);
+        exit = r.code;
+        layoutChanged = JSON.stringify(await readLayout()) !== before;
+        if (r.spawnError) throw new AgentError(r.spawnError);
+        if (r.timedOut) throw new AgentError(`The agent did not answer within ${AGENT_TIMEOUT_MS / 1000} s.`);
+        let parsed: { result?: unknown; is_error?: boolean } | null = null;
+        try {
+          parsed = JSON.parse(r.stdout);
+        } catch {
+          parsed = null;
+        }
+        const result = parsed && typeof parsed.result === "string" ? parsed.result.trim() : "";
+        if (r.code !== 0 || !parsed || parsed.is_error) throw new AgentError(firstLine(result) || firstLine(r.stderr) || firstLine(r.stdout) || `Claude CLI exited ${r.code}`);
+        answer = result || "(no answer)";
+      } catch (e) {
+        // the only part: the run's own error is the reply, as before; one of several: that part says it failed, the rest still answer
+        if (parts.length === 1 || !(e instanceof AgentError)) throw e;
+        for (const p of agentParts) add(p, { path: p.kind as RoutePath, trail: [p.kind as RoutePath], answer: e.message }, { outcome: "refused" });
+        answer = "";
+      }
+      if (answer) {
+        // the second net: the run said set-layout cannot express it, so its layout parts go on to the change path
+        const cannot = CANNOT_LAYOUT.exec(answer);
+        const layoutParts = agentParts.filter((p) => p.kind === "layout");
+        if (cannot && !layoutChanged && layoutParts.length) {
+          for (const p of layoutParts) toChange.push({ p, from: "layout", why: cannot[1].trim() || "set-layout cannot express it" });
+          const rest = answer.replace(CANNOT_LAYOUT, "").trim();
+          for (const p of agentParts.filter((x) => x.kind === "read")) add(p, { path: "read", trail: ["read"], answer: rest || "(no answer)" }, { outcome: "answered" });
+        } else {
+          agentParts.forEach((p, i) =>
+            add(
+              p,
+              { path: p.kind as RoutePath, trail: [p.kind as RoutePath], answer: i === 0 ? answer : "" },
+              { outcome: p.kind === "layout" ? (layoutChanged ? "moved" : "unchanged") : "answered" },
+            ),
+          );
+        }
       }
     }
-    const before = JSON.stringify(await readLayout());
-    const r = await (deps.runAgent ?? runCli)(buildArgs(q, cfg, imagePaths, { layoutWrites: deps.canApply !== false }), cwd);
-    exit = r.code;
-    layoutChanged = JSON.stringify(await readLayout()) !== before;
-    if (r.spawnError) throw new AgentError(r.spawnError);
-    if (r.timedOut) throw new AgentError(`The agent did not answer within ${AGENT_TIMEOUT_MS / 1000} s.`);
-    let parsed: { result?: unknown; is_error?: boolean } | null = null;
-    try {
-      parsed = JSON.parse(r.stdout);
-    } catch {
-      parsed = null;
+
+    // 5. change: one applied change for every change part (this Mac or a paired phone), filed for anyone else
+    let job: AskResult["job"];
+    if (toChange.length) {
+      const lead = toChange[0].p;
+      const title = toChange.map((c) => c.p.title).find(Boolean) || lead.text.slice(0, 60) || q.slice(0, 60);
+      const changeText = single && !parts.some((p) => p.kind === "board") ? q : toChange.map((c) => c.p.text).join(" ");
+      const fullText = changeText === q ? q : `${changeText}\n\n(From the console's request "${q}": its other parts were handled separately, so change only this.)`;
+      const pc = { ...partClassification({ ...lead, kind: "change", title }), kind: "change" as const };
+      const esc = toChange.find((c) => c.from);
+      const escNote = esc ? `Set-layout cannot do this (${esc.why}), so it went on to the change path. ` : "";
+      const trailOf = (c: (typeof toChange)[number]): RoutePath[] => (c.from ? [c.from, "change"] : ["change"]);
+      if (canApply) {
+        try {
+          const boardFas = parts.filter((p) => p.kind === "board" && p.fa).map((p) => p.fa!);
+          const fa = await requestFa(q, pc, boardFas).catch(() => undefined);
+          const j = (deps.apply ?? liveApply)({ question: fullText, title, fa, images: decoded }, pc);
+          applied = j.id;
+          job = { id: j.id, status: j.status };
+          const answer = `${escNote}Applying "${title}": the code agent is changing a copy of the cockpit${decoded.length ? ` from your ${decoded.length === 1 ? "image" : decoded.length + " images"}` : ""}. It goes live only after the scope check, typecheck, tests, build and a Playwright check pass; otherwise nothing changes.`;
+          toChange.forEach((c, i) => add(c.p, { path: "change", trail: trailOf(c), answer: i === 0 ? answer : "", ...(c.from ? { escalated: c.why } : {}) }, { outcome: "applying", job: j.id }));
+        } catch (e) {
+          // another applied change is running: said, not thrown, so the request's other parts still answer
+          const why = e instanceof Error ? e.message : String(e);
+          toChange.forEach((c, i) => add(c.p, { path: "change", trail: trailOf(c), answer: i === 0 ? escNote + why : "", ...(c.from ? { escalated: c.why } : {}) }, { outcome: "refused" }));
+        }
+      } else {
+        const f = await (deps.fileRequest ?? fileRequestCard)(fullText, pc, decoded, "asked from a device that is neither this Mac nor a paired phone, so the change was filed instead of applied");
+        filed = f;
+        const head = f.again ? `Already filed as ${f.fa}: ${f.title} (asked again; noted on the card, nothing new filed).` : `Filed ${f.fa}: ${f.title}.`;
+        const answer = `${escNote}${head} Changes apply from ${PAIRING}; from this device it was filed instead.${imagesLine(f)}`;
+        toChange.forEach((c, i) => add(c.p, { path: "filed", trail: c.from ? [c.from, "filed"] : ["filed"], answer: i === 0 ? answer : "", ...(c.from ? { escalated: c.why } : {}) }, { outcome: "filed", card: f.fa }));
+      }
     }
-    const result = parsed && typeof parsed.result === "string" ? parsed.result.trim() : "";
-    if (r.code !== 0 || !parsed || parsed.is_error) {
-      throw new AgentError(firstLine(result) || firstLine(r.stderr) || firstLine(r.stdout) || `Claude CLI exited ${r.code}`);
+
+    // 6. system: filed as a board card with its images, never executed here
+    for (const p of systemParts) {
+      const f = await (deps.fileRequest ?? fileRequestCard)(single ? q : p.text, partClassification(p), toChange.length ? [] : decoded, "it needs the system side (data or an action the cockpit's client does not serve yet, or lane, board or model behaviour)");
+      filed ??= f;
+      const head = f.again ? `Already filed as ${f.fa}: ${f.title} (asked again; noted on the card, nothing new filed).` : `Filed ${f.fa}: ${f.title}.`;
+      add(p, { path: "filed", trail: ["filed"], answer: `${head} It needs the system side, so it was filed rather than applied.${imagesLine(f)}` }, { outcome: "filed", card: f.fa });
     }
-    return { answer: result || "(no answer)", layoutChanged, kind: cls.kind, ...(cls.ok ? {} : { classifyNote: cls.detail || "classifier unavailable" }) };
+
+    // the reply, in the request's order
+    const ordered = [...results].sort((a, b) => a.at - b.at);
+    const lead = ordered.find((r) => r.kind !== "board") ?? ordered[0];
+    const kind: PartKind = !lead ? "read" : lead.path === "filed" ? (lead.kind === "system" ? "system" : "change") : (lead.path as PartKind);
+    return {
+      answer: ordered.map((r) => r.answer).filter(Boolean).join(" ") || "(no answer)",
+      layoutChanged,
+      kind,
+      ...(filed ? { card: filed } : {}),
+      ...(job ? { job } : {}),
+      parts: ordered.map(({ route: _r, at: _a, ...r }) => r),
+      offers,
+      ...(cls.ok ? {} : { classifyNote: cls.detail || "classifier unavailable" }),
+    };
   } catch (e) {
     error = e instanceof Error ? e.message : String(e);
     throw e instanceof AgentError ? e : new AgentError(error);
@@ -365,7 +502,8 @@ export async function askAgent(
       time: new Date().toISOString(),
       question: q,
       images: decoded.length,
-      kind,
+      kind: cls?.kind,
+      ...(cls?.parts && cls.parts.length > 1 ? { parts: cls.parts.map((p) => p.kind) } : {}),
       ...(filed ? { card: filed.fa, attached: filed.attached } : {}),
       ...(applied ? { job: applied } : {}),
       exit,
@@ -374,5 +512,15 @@ export async function askAgent(
       ...(error ? { error } : {}),
     });
     await appendFile(path.join(dir, "ask-agent.log"), line + "\n").catch(() => {});
+    // FA-19087: the routing KPI's row (ask-routes.ts); an ask refused before it was classified is not a routing decision
+    if (cls) {
+      const routes = results.map((r) => r.route);
+      if (error && !routes.length) routes.push({ kind: cls.kind, path: cls.kind === "system" ? "filed" : (cls.kind as RoutePath), trail: [cls.kind as RoutePath], outcome: "refused" });
+      await appendRoute(dir, { at: new Date(started).toISOString(), q: q.slice(0, 500), ok: cls.ok, canApply, parts: routes });
+    }
   }
+}
+
+function imagesLine(f: FiledRequest): string {
+  return f.attached === "board" ? ` ${plural(f.images.length, "image")} attached to the card.` : f.attached === "folder" ? ` Images saved and named on the card: ${f.images.join(", ")}.` : "";
 }

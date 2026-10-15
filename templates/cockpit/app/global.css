@@ -1951,3 +1951,18 @@ select.cp-in {
   padding: 0 8px;
   min-width: 28px;
 }
+
+/* ---------- FA-19087: a split Ask request - each part's path (an arrow when it escalated), and a board action offered as a one-tap confirm ---------- */
+.cp-ask-parts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-right: 4px;
+}
+.cp-ask-path.k-board {
+  border-color: rgba(251, 191, 36, 0.55);
+  color: var(--amb);
+}
+.cp-ask-offers {
+  margin: 6px 0 2px;
+}

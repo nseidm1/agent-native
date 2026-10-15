@@ -27,11 +27,13 @@ describe("ask classification", () => {
   });
 
   it("reads the JSON answer, and falls back to read (the path that cannot change code) on anything else", () => {
-    expect(parseClassification('{"kind":"change","title":"Search in the Board dialog","area":"dialog"}')).toEqual({
+    // the single-object answer that predates parts still reads, as one part
+    expect(parseClassification('{"kind":"change","title":"Search in the Board dialog","area":"dialog"}', "search the board window")).toEqual({
       kind: "change",
       title: "Search in the Board dialog",
       area: "dialog",
       ok: true,
+      parts: [{ kind: "change", text: "search the board window", title: "Search in the Board dialog", area: "dialog", width: "any" }],
     });
     expect(parseClassification('Sure! {"kind":"layout","title":""}')).toMatchObject({ kind: "layout", area: "region", ok: true });
     expect(parseClassification('{"kind":"delete-everything"}')).toMatchObject({ kind: "read", ok: false });
@@ -61,7 +63,8 @@ describe("a change request becomes a board card", () => {
     expect(c.change).toContain("templates/cockpit/app/components/cockpit/CardDialog.tsx:CardDialog");
     expect(c.change).toContain("GREEN when");
     const page = buildRequestCard("change the cockpit page's toolbar", { title: "", area: "page" }, { at: "t", images: 0 });
-    expect(page.change).toContain("outside the card region app");
+    // FA-19087: agent-native renders the whole cockpit page, so a page change is fork work in Cockpit.tsx
+    expect(page.change).toContain("templates/cockpit/app/components/cockpit/Cockpit.tsx:Cockpit");
     expect(page.title).toBe("Cockpit region: change the cockpit page's toolbar");
     expect(plainText("HOLD: x\n[needs a human] UMBRELLA")).toBe("On hold: x (needs the console) parent");
   });

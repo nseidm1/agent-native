@@ -6,8 +6,10 @@ import { AgentError, askAgent } from "../server/cockpit/agent.js";
 import { askerCanApply } from "../server/middleware/ask-agent-loopback.js";
 
 /**
- * The "Ask agent" panel. Each ask is first classified by a tool-less CLI call
- * (server/cockpit/classify.ts): a frontend "change" is APPLIED live by
+ * The "Ask agent" panel. Each ask is first split into parts by a tool-less CLI call
+ * (server/cockpit/classify.ts; FA-19087: each part takes its own path, a layout part
+ * set-layout cannot express escalates to change, a board card action is offered as a
+ * one-tap confirm and never filed): a frontend "change" is APPLIED live by
  * agent-native's code agent behind the gates (server/cockpit/apply/job.ts,
  * FA-19080; the panel follows it with get-ask-job and offers undo-ask-change);
  * a "system" request is filed as a board card with its images
@@ -24,7 +26,7 @@ import { askerCanApply } from "../server/middleware/ask-agent-loopback.js";
  */
 export default defineAction({
   description:
-    "Ask the cockpit's agent (the Mac's Claude Code CLI) about the card region: a tool-less classifier picks the path; a layout or read ask runs the agent (it may rearrange cards through set-layout); a frontend change is applied live by agent-native's code agent once its gates pass (followed with get-ask-job); a request that needs the system side is filed as a board card with its images and never executed.",
+    "Ask the cockpit's agent (the Mac's Claude Code CLI): a tool-less classifier splits the request into parts and picks each part's path; a layout or read part runs the agent (it may rearrange the 14 region cards through set-layout), and a layout part set-layout cannot express escalates to the change path; a frontend change is applied live by agent-native's code agent once its gates pass (followed with get-ask-job); a board card action (cancel, pause, resume, backlog, promote) is returned as an offer the viewer taps (cockpit-board-card-action); a request that needs the system side is filed as a board card with its images and never executed. Every ask is logged for the routing KPI (get-ask-routes).",
   schema: z.object({
     question: z.string().min(1).max(2000).describe("The question, at most 2000 characters"),
     images: z
