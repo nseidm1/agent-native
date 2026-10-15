@@ -2,8 +2,9 @@
 /**
  * Proves, through the cockpit (default http://127.0.0.1:5207/, loopback), with Playwright (system Chrome):
  *   (b) a layout ask in the Ask agent panel takes the layout path and rearranges the cards (the layout is restored after);
- *   (a) with --file-card: "Add a search button to the board card's dialog" takes the change path, files a board card,
- *       replies "Filed FA-n: ...", and changes nothing: the fork's HEAD, its working tree and the built server are as before;
+ *   (a) with --file-card: a request that needs the system side takes the system path (FA-19080: a frontend change is
+ *       applied instead, see verify-ask-apply.mjs), files a board card, replies "Filed FA-n: ...", and changes nothing:
+ *       the fork's HEAD, its working tree and the built server are as before;
  *   (c) the Board card's dialog has a search field that narrows the list when a card id is typed, at 1280 and 390;
  * no console errors and no sideways scroll. Screenshots go to the directory given first.
  *
@@ -154,16 +155,16 @@ try {
   const restored = await action(frame, "set-layout", before);
   check("layout restored after the check", restored.status === 200, String(restored.status));
 
-  // (a) a change request files a card and changes nothing
+  // (a) a system-side request files a card and changes nothing
   if (fileCard) {
     const head0 = git("rev-parse", "HEAD");
     const tree0 = git("status", "--porcelain");
     const built0 = builtAt();
     const t0 = Date.now();
-    const r = await ask(frame, "Add a search button to the board card's dialog");
+    const r = await ask(frame, "Add a new field to the cockpit's office resource: refusal reasons per hour");
     const m = /^(?:Filed|Already filed as) (FA-\d+): /.exec(r.text || "");
     filedFa = m ? m[1] : "";
-    check("change request takes the change path", r.kind === "change", `${r.kind}: ${r.text} | ${r.meta}`);
+    check("system request takes the system path", r.kind === "system", `${r.kind}: ${r.text} | ${r.meta}`);
     check("change request replies with the filed card number", !!filedFa, r.text);
     check("change request changed no code: fork HEAD and working tree as before", git("rev-parse", "HEAD") === head0 && git("status", "--porcelain") === tree0, head0.slice(0, 8));
     check("change request triggered no build", builtAt() === built0, `built server mtime ${new Date(built0).toISOString()}, ask took ${Math.round((Date.now() - t0) / 1000)} s`);

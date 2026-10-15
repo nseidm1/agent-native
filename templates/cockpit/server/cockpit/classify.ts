@@ -1,16 +1,22 @@
 /**
- * Which path an Ask agent request takes (console 2026-10-15: "Ask agent
- * answers layout questions as it does now. When you ask for a change ... it
- * files a board card with your request and any images you attached, and
- * replies with the card number ... so nothing runs code straight from the
- * panel").
+ * Which path an Ask agent request takes. FA-18951 filed every change as a
+ * card; FA-19080 (console 2026-10-15: "The agent can modify the entire
+ * frontend cockpit, the user facing UI and nothing part of the system
+ * abstracted by the client") splits a change in two:
+ *
+ *   layout   move, hide, show or resize cards: the region agent run (set-layout)
+ *   read     a question about what the cards show: the same run, reads only
+ *   change   anything the FRONTEND can do (how a card looks, a new face or view of
+ *            data the cockpit already serves): APPLIED live by agent-native's code
+ *            agent behind the gates in apply/job.ts (loopback only; a remote caller's
+ *            change is filed as a card instead)
+ *   system   anything that needs the system side (new data or a new action in the
+ *            cockpit's client, a write, the cockpit page outside the region, lane
+ *            behaviour): filed as a board card by request-card.ts, never executed
  *
  * One short call to the Mac's Claude CLI with NO tools at all (--tools "",
  * --strict-mcp-config with no config, no setting sources, dontAsk), returning
- * {"kind":"layout"|"read"|"change","title","area"} as JSON. The answer only
- * picks a path: layout and read go to the existing agent run (four region
- * tools, nothing else); change goes to request-card.ts, which files a card and
- * never edits, builds or runs anything.
+ * {"kind","title","area"} as JSON. The answer only picks a path.
  */
 import { mkdir } from "node:fs/promises";
 import os from "node:os";
@@ -18,8 +24,8 @@ import path from "node:path";
 
 import { firstLine, runCli } from "./agent.js";
 
-export type AskKind = "layout" | "read" | "change";
-export const ASK_KINDS: readonly AskKind[] = ["layout", "read", "change"];
+export type AskKind = "layout" | "read" | "change" | "system";
+export const ASK_KINDS: readonly AskKind[] = ["layout", "read", "change", "system"];
 
 /** Where a change would land; the request card's CHANGE line names the file. */
 export const CHANGE_AREAS = {
@@ -44,11 +50,13 @@ export interface Classification {
 export const CLASSIFY_TIMEOUT_MS = 30_000;
 export const CLASSIFY_SYSTEM_PROMPT = [
   "You route requests typed into the Ask agent panel of a cockpit's status-card region. You never act on the request; you only classify it.",
-  'Reply with ONE line of JSON and nothing else: {"kind":"layout"|"read"|"change","title":"<at most 48 characters>","area":"region"|"panel"|"dialog"|"data"|"page"}.',
+  'Reply with ONE line of JSON and nothing else: {"kind":"layout"|"read"|"change"|"system","title":"<at most 48 characters>","area":"region"|"panel"|"dialog"|"data"|"page"}.',
   "kind: layout = move, reorder, hide, show or resize the existing cards; read = a question about what the cards or their windows show;",
-  "change = anything that needs new or different code: a new feature, button, field, search, style, behaviour, data source, or a change to the cockpit page.",
-  "title: a short imperative card title for a change (e.g. 'Search field in the Board card dialog'), else empty.",
-  "area (for a change): region = the card grid; panel = this Ask agent panel; dialog = a card's click window; data = what a card or window reads;",
+  "change = a change to the card region's own user interface that frontend code can make with data the cockpit already serves: restyle or redesign a card (often to match an attached image or mockup), a new card face, view, panel, icon, colour, chart, button or search over data already there, a change to a card's click window or to this Ask panel;",
+  "system = anything that needs the system side: data or a field the cockpit does not serve yet, a new action or write, lane, board or model behaviour, or the cockpit page outside the card region (its toolbar, header, other panels).",
+  "Prefer change for anything about how the region looks or what it shows; use system only when the region cannot do it with what it already reads.",
+  "title: a short imperative title for a change or system request (e.g. 'Restyle the office card as a neon tile grid'), else empty.",
+  "area (for change or system): region = the card grid; panel = this Ask agent panel; dialog = a card's click window; data = what a card or window reads;",
   "page = the cockpit page around the region (its toolbar, header, other panels, tools/lane/maint/ui). Use region when unsure.",
 ].join(" ");
 

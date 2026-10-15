@@ -1,9 +1,10 @@
 /**
- * A "change" asked in the Ask agent panel becomes a board card, never an edit
- * (console 2026-10-15: "it files a board card with your request and any
- * images you attached, and replies with the card number. That card then gets
- * built, Playwright-checked and deployed through the normal path, so nothing
- * runs code straight from the panel").
+ * A request the Ask agent panel cannot apply itself becomes a board card,
+ * never an edit (FA-18951; since FA-19080 that is a "system" request, one the
+ * code agent found needs the system side, or a change asked from a remote
+ * device, which is read-only): "it files a board card with your request and
+ * any images you attached, and replies with the card number. That card then
+ * gets built, Playwright-checked and deployed through the normal path".
  *
  * The card is filed by the parent repo's own filer, node
  * tools/lane/file-card.mjs <batch.json>, run from the repo root with an argv
@@ -60,7 +61,7 @@ export interface RequestCard {
 }
 
 /** The batch entry for one request. Pure, so the shape is testable without filing. */
-export function buildRequestCard(question: string, cls: Pick<Classification, "title" | "area">, opts: { at: string; images: number }): RequestCard {
+export function buildRequestCard(question: string, cls: Pick<Classification, "title" | "area">, opts: { at: string; images: number; why?: string }): RequestCard {
   const q = plainText(question).slice(0, REQUEST_NOTE_MAX);
   const short = cleanTitle(cls.title) || cleanTitle(q) || "change request from Ask agent";
   const title = (TITLE_PREFIX + short).slice(0, 56).trim();
@@ -81,7 +82,8 @@ export function buildRequestCard(question: string, cls: Pick<Classification, "ti
     q +
     '". Filed by the region (' +
     PARENT_CARD +
-    "): a change asked in the panel is never executed from the panel; this card is built, Playwright-checked and deployed through the normal path." +
+    "): a request the panel cannot apply itself is never executed from the panel; this card is built, Playwright-checked and deployed through the normal path." +
+    (opts.why ? " WHY IT WAS FILED, NOT APPLIED: " + plainText(opts.why).slice(0, 600) : "") +
     (opts.images ? " Images: " + opts.images + " attached by the console with the request." : "");
   return {
     id: "req",
@@ -162,7 +164,7 @@ export const titleSlug = (t: string) =>
     .replace(/^-+|-+$/g, "");
 
 /** The FA number of the card holding exactly this title, read from the board's own state. */
-async function faOfTitle(root: string, title: string): Promise<string | null> {
+export async function faOfTitle(root: string, title: string): Promise<string | null> {
   try {
     const st = JSON.parse(await readFile(path.join(root, "tools", "board", "board.json"), "utf8"));
     const slug = titleSlug(title);
@@ -174,11 +176,11 @@ async function faOfTitle(root: string, title: string): Promise<string | null> {
   }
 }
 
-export async function fileRequestCard(question: string, cls: Classification, images: DecodedImage[]): Promise<FiledRequest> {
+export async function fileRequestCard(question: string, cls: Classification, images: DecodedImage[], why?: string): Promise<FiledRequest> {
   const root = portfolioDir();
   const filer = path.join(root, "tools", "lane", "file-card.mjs");
   if (!existsSync(filer)) throw new AgentError(`The card filer is not at ${filer}; nothing was filed.`);
-  const card = buildRequestCard(question, cls, { at: new Date().toISOString(), images: images.length });
+  const card = buildRequestCard(question, cls, { at: new Date().toISOString(), images: images.length, why });
   const dir = path.join(dataDir(), "requests");
   await mkdir(dir, { recursive: true });
   const batch = path.join(dir, `${Date.now()}-${randomBytes(4).toString("hex")}.json`);

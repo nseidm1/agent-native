@@ -33,9 +33,11 @@ import {
   sniffImageType,
 } from "../../shared/ask-images.js";
 import { WRITE_ACTION_NAMES } from "../../shared/cockpit-detail.js";
+import { type ApplyInput, type ApplyJob, applyPaths, startApply } from "./apply/job.js";
+import { liveDeps } from "./apply/runtime.js";
 import { type AskKind, type Classification, classify } from "./classify.js";
 import { readLayout } from "./layout.js";
-import { type FiledRequest, fileRequestCard } from "./request-card.js";
+import { buildRequestCard, faOfTitle, type FiledRequest, fileRequestCard, portfolioDir } from "./request-card.js";
 
 export const AGENT_TIMEOUT_MS = 120_000;
 export const MCP_SERVER_NAME = "cockpit";
@@ -223,18 +225,41 @@ export function buildMcpConfig(ownerEmail: string) {
 export interface AskResult {
   answer: string;
   layoutChanged: boolean;
-  /** Which path ran: layout and read are the agent run; change filed a board card and changed nothing. */
+  /** Which path ran: layout and read are the agent run; change started an applied change (job); system filed a board card. */
   kind: AskKind;
   /** The classifier's own note when it failed and the read path was used as the safe default. */
   classifyNote?: string;
   card?: FiledRequest;
+  /** For an applied change: the background job the panel follows (get-ask-job) until it is live or reverted. */
+  job?: { id: string; status: ApplyJob["status"] };
 }
 
-/** Injectable for tests: the classifier and the filer. */
+/** Injectable for tests: the classifier, the filer and the apply starter. */
 export interface AskDeps {
   classify?: (q: string) => Promise<Classification>;
   fileRequest?: typeof fileRequestCard;
   runAgent?: typeof runCli;
+  apply?: (input: ApplyInput, cls: Classification) => ApplyJob;
+  /** false for a caller that is not on this Mac: a change is filed, never applied (the region is read-only from remote). */
+  canApply?: boolean;
+}
+
+/** A board card named in the request, or the one already filed for this same request (FA-18951's again path). */
+async function requestFa(q: string, cls: Classification): Promise<string | undefined> {
+  const named = /\bFA-\d{1,6}\b/.exec(q);
+  if (named) return named[0];
+  const t = buildRequestCard(q, cls, { at: "", images: 0 }).title;
+  return (await faOfTitle(portfolioDir(), t)) ?? undefined;
+}
+
+/** The live apply starter: the gates in apply/job.ts around agent-native's code agent (apply/runtime.ts). */
+function liveApply(input: ApplyInput, cls: Classification): ApplyJob {
+  const P = applyPaths(dataDir());
+  const fileSystemCard = async (why: string) => {
+    const f = await fileRequestCard(input.question, { ...cls, kind: "system" }, input.images, why);
+    return { fa: f.fa, title: f.title };
+  };
+  return startApply(P, input, liveDeps(P, fileSystemCard));
 }
 
 export async function askAgent(
@@ -261,17 +286,33 @@ export async function askAgent(
   let error: string | undefined;
   let kind: AskKind | undefined;
   let filed: FiledRequest | undefined;
+  let applied: string | undefined;
   try {
     await mkdir(dir, { recursive: true });
     // 1. which path: a short tool-less CLI call; an unreadable answer falls back to read (the run that cannot change code)
     const cls = await (deps.classify ?? classify)(q);
     kind = cls.kind;
-    if (cls.kind === "change") {
-      // 2a. a change is never executed here: it becomes a board card carrying the request and its images
-      filed = await (deps.fileRequest ?? fileRequestCard)(q, cls, decoded);
+    if (cls.kind === "change" && deps.canApply !== false) {
+      // 2a. a frontend change is APPLIED: agent-native's code agent edits a worktree, and it goes live only through the gates
+      const fa = await requestFa(q, cls).catch(() => undefined);
+      const title = cls.title || q.slice(0, 60);
+      const job = (deps.apply ?? liveApply)({ question: q, title, fa, images: decoded }, cls);
+      applied = job.id;
+      return {
+        answer: `Applying "${title}": the code agent is changing a copy of the region${decoded.length ? ` from your ${decoded.length === 1 ? "image" : decoded.length + " images"}` : ""}. It goes live only after the scope check, typecheck, tests, build and a Playwright check pass; otherwise nothing changes.`,
+        layoutChanged: false,
+        kind: "change",
+        job: { id: job.id, status: job.status },
+      };
+    }
+    if (cls.kind === "change" || cls.kind === "system") {
+      // 2b. the system side, or a change asked from a remote device: filed as a board card with its images, never executed here
+      const why = cls.kind === "change" ? "asked from a device that is not this Mac; the card region is read-only from remote, so the change was filed instead of applied" : "it needs the system side (data or an action the cockpit's client does not serve yet, or behaviour outside the card region)";
+      filed = await (deps.fileRequest ?? fileRequestCard)(q, cls, decoded, why);
       const imgs = filed.attached === "board" ? ` ${filed.images.length} image${filed.images.length === 1 ? "" : "s"} attached to the card.` : filed.attached === "folder" ? ` Images saved and named on the card: ${filed.images.join(", ")}.` : "";
       const head = filed.again ? `Already filed as ${filed.fa}: ${filed.title} (asked again; noted on the card, nothing new filed).` : `Filed ${filed.fa}: ${filed.title}.`;
-      return { answer: head + imgs, layoutChanged: false, kind, card: filed };
+      const reason = cls.kind === "change" ? " Changes apply only from the cockpit's own Mac; from here it was filed instead." : " It needs the system side, so it was filed rather than applied.";
+      return { answer: head + reason + imgs, layoutChanged: false, kind: cls.kind, card: filed };
     }
     // 2b. layout and read: today's agent run, four region tools and nothing else
     const cfg = path.join(dir, "mcp-config.json");
@@ -318,6 +359,7 @@ export async function askAgent(
       images: decoded.length,
       kind,
       ...(filed ? { card: filed.fa, attached: filed.attached } : {}),
+      ...(applied ? { job: applied } : {}),
       exit,
       layoutChanged,
       ms: Date.now() - started,

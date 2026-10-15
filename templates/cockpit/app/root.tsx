@@ -15,7 +15,11 @@ configureTracking({
   getDefaultProps: (_name, properties) => ({ ...properties, app: "cockpit" }),
 });
 
-export const links: LinksFunction = () => [{ rel: "stylesheet", href: stylesheet }];
+// the favicon is named, so the browser does not ask for a missing favicon.ico (a console 404 the Ask agent's Playwright gate refuses)
+export const links: LinksFunction = () => [
+  { rel: "stylesheet", href: stylesheet },
+  { rel: "icon", type: "image/svg+xml", href: import.meta.env.BASE_URL + "favicon.svg" },
+];
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (

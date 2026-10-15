@@ -155,35 +155,67 @@ ${opts.files ? 'writeFileSync(b.replace(/\\.json$/, "") + ".ids.json", JSON.stri
     expect(filerWhy("x\nNOT FILED (1 of 1):\n  req: not created, a task with this title already exists\n")).toBe("req: not created, a task with this title already exists");
   });
 
-  it("routes a change to the filer and never starts the agent; a layout ask runs the agent", async () => {
+  it("files a system request and never starts the agent; applies a frontend change as a job; files a remote change; a layout ask runs the agent", async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), "cockpit-route-"));
     process.env.COCKPIT_DATA_DIR = dir;
     const runAgent = vi.fn(async () => ({ code: 0, stdout: JSON.stringify({ result: "Moved." }), stderr: "", timedOut: false }));
     const fileRequest = vi.fn(async () => ({ fa: "FA-9", title: "Cockpit region: Search", attached: "board" as const, images: ["ask-request-1.png"] }));
+    const apply = vi.fn((input: { question: string; images: unknown[] }) => ({ id: "ask-20261015-abc123", status: "running" as const, input }) as never);
     try {
       const png = PNG.toString("base64");
-      const change = await askAgent("Add a search button to the board card's dialog", "dev@local.test", [{ name: "a.png", data: png }], {
-        classify: async () => ({ kind: "change", title: "Search", area: "dialog", ok: true }),
+      const system = await askAgent("Add a refusal-rate field to the office resource", "dev@local.test", [{ name: "a.png", data: png }], {
+        classify: async () => ({ kind: "system", title: "Search", area: "data", ok: true }),
         fileRequest,
         runAgent,
+        apply,
       });
-      expect(change).toMatchObject({ kind: "change", layoutChanged: false, answer: "Filed FA-9: Cockpit region: Search. 1 image attached to the card." });
+      expect(system).toMatchObject({ kind: "system", layoutChanged: false });
+      expect(system.answer).toMatch(/^Filed FA-9: Cockpit region: Search\. It needs the system side, so it was filed rather than applied\. 1 image attached to the card\.$/);
       expect(runAgent).not.toHaveBeenCalled();
       expect((fileRequest.mock.calls[0] as unknown[])[2]).toHaveLength(1);
+
+      const change = await askAgent("make the office card look like what's attached (FA-19080)", "dev@local.test", [{ name: "a.png", data: png }], {
+        classify: async () => ({ kind: "change", title: "Restyle the office card", area: "region", ok: true }),
+        fileRequest,
+        runAgent,
+        apply,
+      });
+      expect(change).toMatchObject({ kind: "change", job: { id: "ask-20261015-abc123", status: "running" } });
+      expect(change.answer).toMatch(/^Applying "Restyle the office card"/);
+      const applied = (apply.mock.calls[0] as unknown[])[0] as { fa: string; images: unknown[] };
+      expect(applied.fa).toBe("FA-19080");
+      expect(applied.images).toHaveLength(1);
+      expect(fileRequest).toHaveBeenCalledTimes(1);
+
+      const remote = await askAgent("make the office card blue", "dev@local.test", [], {
+        classify: async () => ({ kind: "change", title: "Blue office card", area: "region", ok: true }),
+        fileRequest,
+        runAgent,
+        apply,
+        canApply: false,
+      });
+      expect(remote.kind).toBe("change");
+      expect(remote.answer).toMatch(/from here it was filed instead/);
+      expect(apply).toHaveBeenCalledTimes(1);
+      expect(fileRequest).toHaveBeenCalledTimes(2);
+      expect((fileRequest.mock.calls[1] as unknown[])[3]).toMatch(/read-only from remote/);
+
       const layout = await askAgent("move halo to the top", "dev@local.test", [], {
         classify: async () => ({ kind: "layout", title: "", area: "region", ok: true }),
         fileRequest,
         runAgent,
+        apply,
       });
       expect(layout).toMatchObject({ kind: "layout", answer: "Moved." });
       expect(runAgent).toHaveBeenCalledTimes(1);
-      expect(fileRequest).toHaveBeenCalledTimes(1);
       const log = readFileSync(path.join(dir, "ask-agent.log"), "utf8").trim().split("\n").map((l) => JSON.parse(l));
-      expect(log.map((l) => [l.kind, l.card])).toEqual([
-        ["change", "FA-9"],
-        ["layout", undefined],
+      expect(log.map((l) => [l.kind, l.card, l.job])).toEqual([
+        ["system", "FA-9", undefined],
+        ["change", undefined, "ask-20261015-abc123"],
+        ["change", "FA-9", undefined],
+        ["layout", undefined, undefined],
       ]);
-      expect(existsSync(path.join(dir, "images"))).toBe(false); // a change never writes images for an agent run
+      expect(existsSync(path.join(dir, "images"))).toBe(false); // neither path writes images for an agent run
     } finally {
       delete process.env.COCKPIT_DATA_DIR;
     }

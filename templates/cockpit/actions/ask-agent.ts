@@ -2,12 +2,15 @@ import { defineAction, fail } from "@agent-native/core/action";
 import { z } from "zod";
 
 import { ASK_AGENT_MAX_BODY_BYTES, MAX_ASK_IMAGES } from "../shared/ask-images.js";
-import { AgentError, askAgent } from "../server/cockpit/agent.js";
+import { AgentError, askAgent, isLoopbackAddress } from "../server/cockpit/agent.js";
 
 /**
  * The "Ask agent" panel. Each ask is first classified by a tool-less CLI call
- * (server/cockpit/classify.ts): a "change" is filed as a board card with its
- * images (server/cockpit/request-card.ts) and never executed; layout and read
+ * (server/cockpit/classify.ts): a frontend "change" is APPLIED live by
+ * agent-native's code agent behind the gates (server/cockpit/apply/job.ts,
+ * FA-19080; the panel follows it with get-ask-job and offers undo-ask-change);
+ * a "system" request is filed as a board card with its images
+ * (server/cockpit/request-card.ts) and never executed; layout and read
  * run the Mac's logged-in Claude Code CLI against this
  * app's own MCP tools (get-cards, get-card-detail, get-layout, set-layout) and nothing else;
  * UI only: never an agent or MCP tool, so a run cannot start another run.
@@ -18,7 +21,7 @@ import { AgentError, askAgent } from "../server/cockpit/agent.js";
  */
 export default defineAction({
   description:
-    "Ask the cockpit's agent (the Mac's Claude Code CLI) about the card region: a tool-less classifier picks the path; a layout or read ask runs the agent (it may rearrange cards through set-layout); a change request is filed as a board card with its images and never executed.",
+    "Ask the cockpit's agent (the Mac's Claude Code CLI) about the card region: a tool-less classifier picks the path; a layout or read ask runs the agent (it may rearrange cards through set-layout); a frontend change is applied live by agent-native's code agent once its gates pass (followed with get-ask-job); a request that needs the system side is filed as a board card with its images and never executed.",
   schema: z.object({
     question: z.string().min(1).max(2000).describe("The question, at most 2000 characters"),
     images: z
@@ -39,7 +42,10 @@ export default defineAction({
   mcpTool: false,
   run: async ({ question, images }, ctx) => {
     try {
-      return await askAgent(question, ctx?.userEmail, images ?? []);
+      // the middleware already refuses a remote caller; this is the second check, so a change from off this Mac is filed, never applied
+      const peer = ctx?.requestHeaders?.get("x-cockpit-peer");
+      const canApply = !peer || isLoopbackAddress(peer);
+      return await askAgent(question, ctx?.userEmail, images ?? [], { canApply });
     } catch (e) {
       // the CLI's own error line (missing, logged out, timed out) reaches the panel
       if (e instanceof AgentError) fail(e.message, { errorCode: "ask_agent_failed", statusCode: e.status });

@@ -12,6 +12,7 @@ import {
   DEFAULT_LAYOUT,
   type Tone,
 } from "@shared/cockpit";
+import { AppliedBanner, ApplyProgress } from "./ApplyStatus";
 import { BoardDialog } from "./BoardDialog";
 import { CardDialog } from "./CardDialog";
 import { type AskImage, MAX_ASK_IMAGES, precheckImageFile, sniffImageType } from "@shared/ask-images";
@@ -128,15 +129,16 @@ function readImageFile(f: File): Promise<Attached> {
   });
 }
 
-type AskKind = "layout" | "read" | "change";
+type AskKind = "layout" | "read" | "change" | "system";
 interface AskReply {
   answer: string;
   layoutChanged: boolean;
   kind: AskKind;
   classifyNote?: string;
   card?: { fa: string; title: string; attached: string; images: string[] };
+  job?: { id: string; status: string };
 }
-const PATH_LABEL: Record<AskKind, string> = { layout: "Layout path", read: "Read path", change: "Change request" };
+const PATH_LABEL: Record<AskKind, string> = { layout: "Layout path", read: "Read path", change: "Applying change", system: "Filed (system side)" };
 
 const kb = (n: number) => (n < 1024 * 1024 ? Math.max(1, Math.round(n / 1024)) + " KB" : (n / 1024 / 1024).toFixed(1) + " MB");
 
@@ -146,7 +148,7 @@ function AskPanel({ onClose }: { onClose: () => void }) {
   const [images, setImages] = useState<Attached[]>([]);
   const [attachErr, setAttachErr] = useState("");
   const [dragging, setDragging] = useState(false);
-  const [answer, setAnswer] = useState<{ text: string; changed: boolean; images: number; kind: AskKind; fa?: string; note?: string } | null>(null);
+  const [answer, setAnswer] = useState<{ text: string; changed: boolean; images: number; kind: AskKind; fa?: string; note?: string; job?: string } | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const imagesRef = useRef<Attached[]>([]);
@@ -155,7 +157,7 @@ function AskPanel({ onClose }: { onClose: () => void }) {
     // classifier (30 s) + the agent run (120 s) or the card filer (120 s)
     timeoutMs: 280_000,
     onSuccess: (r, vars) => {
-      setAnswer({ text: r.answer, changed: r.layoutChanged, images: vars.images?.length ?? 0, kind: r.kind, fa: r.card?.fa, note: r.classifyNote });
+      setAnswer({ text: r.answer, changed: r.layoutChanged, images: vars.images?.length ?? 0, kind: r.kind, fa: r.card?.fa, note: r.classifyNote, job: r.job?.id });
       setImages([]);
       void qc.invalidateQueries();
     },
@@ -222,7 +224,7 @@ function AskPanel({ onClose }: { onClose: () => void }) {
         void addFiles(Array.from(e.dataTransfer.files));
       }}
     >
-      <label htmlFor="cp-ask-q">Ask the agent to read or rearrange these cards, or request a change</label>
+      <label htmlFor="cp-ask-q">Ask the agent to read, rearrange or change these cards</label>
       <div className="cp-ask-row">
         <textarea
           id="cp-ask-q"
@@ -304,7 +306,7 @@ function AskPanel({ onClose }: { onClose: () => void }) {
       <div className="cp-ask-hint">
         {dragging
           ? "Drop to attach"
-          : `A change request is filed as a board card (with any images) and built through the normal path; nothing runs from here. Images: attach, paste or drop · up to ${MAX_ASK_IMAGES}, 5 MB each, PNG/JPEG/WebP/GIF`}
+          : `A change to this region is applied live by the code agent once scope, typecheck, tests, build and a Playwright check pass, with Undo after; a request that needs the system side is filed as a board card. Images: attach, paste or drop · up to ${MAX_ASK_IMAGES}, 5 MB each, PNG/JPEG/WebP/GIF`}
       </div>
       {attachErr ? (
         <div className="cp-ask-out err" role="alert">
@@ -313,7 +315,7 @@ function AskPanel({ onClose }: { onClose: () => void }) {
       ) : null}
       {ask.isPending ? (
         <div className="cp-ask-out busy" aria-live="polite">
-          Classifying, then answering or filing a card (up to 2 minutes)…
+          Classifying, then answering, applying or filing (up to 2 minutes)…
         </div>
       ) : ask.isError ? (
         <div className="cp-ask-out err" role="alert">
@@ -321,16 +323,19 @@ function AskPanel({ onClose }: { onClose: () => void }) {
         </div>
       ) : answer ? (
         <>
-          <div className={"cp-ask-out" + (answer.kind === "change" ? " filed" : "")} aria-live="polite" data-testid="ask-answer" data-kind={answer.kind}>
+          <div className={"cp-ask-out" + (answer.fa ? " filed" : "")} aria-live="polite" data-testid="ask-answer" data-kind={answer.kind}>
             {answer.text}
           </div>
+          {answer.job ? <ApplyProgress id={answer.job} onFollow={(id) => setAnswer((a) => (a ? { ...a, job: id } : a))} /> : null}
           <div className="cp-ask-meta" data-testid="ask-meta">
             <span className={"cp-ask-path k-" + answer.kind}>{PATH_LABEL[answer.kind]}</span>
-            {answer.kind === "change"
+            {answer.fa
               ? ` Filed as ${answer.fa}; nothing in the cockpit was changed.`
-              : answer.changed
-                ? " Layout changed."
-                : " Layout unchanged."}
+              : answer.job
+                ? " Applied only if every gate passes."
+                : answer.changed
+                  ? " Layout changed."
+                  : " Layout unchanged."}
             {answer.images && answer.kind !== "change" ? ` ${answer.images} image${answer.images === 1 ? "" : "s"} sent.` : ""}
             {answer.note ? ` (Classifier unavailable, answered as a read: ${answer.note})` : ""}
           </div>
@@ -439,6 +444,8 @@ export function CardRegion() {
           ✦ Ask agent
         </button>
       </header>
+
+      <AppliedBanner />
 
       {askOpen ? (
         <div id="cp-ask">
