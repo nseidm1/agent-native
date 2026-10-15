@@ -138,10 +138,14 @@ export function identityOf(e: Any, now = Date.now()): Identity {
 /** The inbox badge (studio-lifecycle.js inboxCount): what needs the console, and the proposals waiting. */
 export function inboxOf(lc: Any, e: Any, questions: Any, app: string) {
   const sig = e && e.promotion && e.promotion.phase === "awaiting-signature" ? 1 : 0;
-  const qs = ((questions && questions.items) || []).filter((q: any) => q && q.app === app).length;
+  const mine = ((questions && questions.items) || []).filter((q: any) => q && q.app === app);
+  const qs = mine.length;
   const need = (lc && lc.inbox ? n0(lc.inbox.needsYou) : 0) + sig + qs;
   const proposals = lc && lc.inbox ? n0(lc.inbox.proposals) : 0;
-  return { need, proposals, text: need ? need + (need === 1 ? " needs you" : " need you") : "Inbox" };
+  // FA-19175: the inbox drawer's Questions for you (studio-lifecycle.js inboxTop): this app's console questions, and how many more wait across the work
+  const list = mine.slice(0, 40).map((q: any) => ({ id: String(q.id || ""), question: String(q.question || ""), priority: String(q.priority || "normal") }));
+  const more = Math.max(0, n0(questions && questions.n) - qs);
+  return { need, proposals, text: need ? need + (need === 1 ? " needs you" : " need you") : "Inbox", qs: list, more };
 }
 
 /** One requirement of the definition of done, as the Build detail lists it. */

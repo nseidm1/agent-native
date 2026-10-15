@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { appsWindow, cardLine, previewOf, requestLine, studioPart, thumbOf, type AppsPartData, type BoardApps } from "./apps";
-import { tileChip } from "./studio";
+import { inboxOf, tileChip } from "./studio";
 
 describe("FA-19129: the Apps picker window", () => {
   const board: BoardApps = {
@@ -56,6 +56,16 @@ describe("FA-19129: the Apps picker window", () => {
     expect(d.sections.find((x) => x.title === "Not shown here yet")).toBeUndefined();
     expect(thumbOf({ id: "Bad/..", thumb: { url: "/x/0123456789ab.jpg" } })).toBeNull();
     expect(thumbOf({ id: "ok", thumb: { url: "/x/notasha.jpg" } })).toBeNull();
+  });
+  it("FA-19175: the inbox carries this app's console questions and how many more wait (studio-lifecycle.js inboxTop)", () => {
+    const qs = { n: 5, items: [{ id: "cq-1", app: "family-office", question: "Ship it?", priority: "blocking" }, { id: "cq-2", app: "other", question: "Other?" }, { id: "cq-3", app: "family-office", question: "Name?" }] };
+    const x = inboxOf({ inbox: { needsYou: 1, proposals: 2 } }, { promotion: { phase: "awaiting-signature" } }, qs, "family-office");
+    expect(x).toMatchObject({ need: 4, proposals: 2, text: "4 need you", more: 3 });
+    expect(x.qs).toEqual([
+      { id: "cq-1", question: "Ship it?", priority: "blocking" },
+      { id: "cq-3", question: "Name?", priority: "normal" },
+    ]);
+    expect(inboxOf(null, null, null, "family-office")).toMatchObject({ need: 0, text: "Inbox", qs: [], more: 0 });
   });
   it("FA-19157: tileChip says what the legacy tile chip says", () => {
     expect(tileChip({ state: "running" }, { total: 4, verified: 2 })).toMatchObject({ text: "Building 2 of 4", tone: "run", spin: true });

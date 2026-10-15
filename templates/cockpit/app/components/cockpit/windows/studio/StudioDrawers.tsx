@@ -1,75 +1,80 @@
 /**
- * FA-19175: the studio's inbox drawer (studio-lifecycle.js inboxTop + the record's questions), its Details drawer
- * (card-studio.js drawer: Brief, Agents, Messages, Ready, Files, Activity) and the lifecycle tiles' full details (Build,
- * Quality, Launch ready, Deploy, Live: studio-lifecycle.js drawDetail, launchBox, deployBox, liveBox). STUB in the shell.
+ * FA-19175: the studio's inbox drawer (studio-lifecycle.js inboxTop + the record's questions, card-studio.js renderQA), its Details
+ * drawer (card-studio.js drawer for an app: Work, Brief, Agents, Messages, Files, Activity) and the lifecycle tiles' full details
+ * (Build, Quality, Launch ready, Deploy, Live: studio-lifecycle.js drawDetail, launchBox, deployBox, liveBox). The pieces live in
+ * ./drawers/; this file is the shell's seam: the two header buttons, the drawer layers and the tile detail.
  */
 import { useStudio } from "./api";
+import { DetailsDrawer } from "./drawers/Details";
+import { InboxDrawer } from "./drawers/Inbox";
+import { TileDetailBody } from "./drawers/TileDetails";
+
+import "./studio-drawers.css";
 
 export function InboxButton() {
   const st = useStudio();
   const s = st.s;
+  const on = st.layer?.kind === "inbox";
   return (
     <button
       type="button"
       className={"cp-btn sm ghost st-inbox" + (s.inbox.need ? " need" : "")}
       data-testid="studio-inbox"
       data-k="inbox"
-      aria-expanded={st.layer?.kind === "inbox"}
-      aria-label={"Inbox" + (s.inbox.need ? ", " + s.inbox.need + " need you" : "") + (s.inbox.proposals ? ", " + s.inbox.proposals + " proposals" : "")}
-      title={s.inbox.need ? s.inbox.need + " waiting on you" : "Inbox: questions, decisions, proposals and activity"}
-      onClick={() => st.open({ kind: "inbox" })}
+      aria-expanded={on}
+      aria-haspopup="dialog"
+      aria-label={
+        "Inbox" +
+        (s.inbox.need ? ", " + s.inbox.need + " need you" : "") +
+        (s.inbox.proposals ? ", " + s.inbox.proposals + " proposals" : "")
+      }
+      title={
+        s.inbox.need
+          ? s.inbox.need +
+            " thing" +
+            (s.inbox.need === 1 ? "" : "s") +
+            " need you"
+          : "Inbox: questions, decisions, proposals and activity"
+      }
+      onClick={() => (on ? st.close() : st.open({ kind: "inbox" }))}
     >
       <span aria-hidden="true">✉</span> {s.inbox.text}
-      {!s.inbox.need && s.inbox.proposals ? <span className="ap-chip">{s.inbox.proposals} proposals</span> : null}
+      {!s.inbox.need && s.inbox.proposals ? (
+        <span className="ap-chip">{s.inbox.proposals} proposals</span>
+      ) : null}
     </button>
   );
 }
 export function DetailsButton() {
   const st = useStudio();
+  const on = st.layer?.kind === "details";
   return (
-    <button type="button" className="cp-btn sm ghost" data-k="details" aria-expanded={st.layer?.kind === "details"} onClick={() => st.open({ kind: "details" })}>
+    <button
+      type="button"
+      className="cp-btn sm ghost"
+      data-k="details"
+      data-testid="studio-details-btn"
+      aria-expanded={on}
+      aria-haspopup="dialog"
+      onClick={() => (on ? st.close() : st.open({ kind: "details" }))}
+    >
       Details
     </button>
   );
 }
+/** The inbox and Details drawers, by the studio's open layer. */
 export function DrawerLayers() {
-  return null;
+  return (
+    <>
+      <InboxDrawer />
+      <DetailsDrawer />
+    </>
+  );
 }
-const STATUS_WORD: Record<string, string> = { verified: "verified", failing: "failing", blocked: "could not check", pending: "not checked yet", unwritten: "no check yet", context: "context" };
 /** A lifecycle tile's detail (k: build | quality | launch | deploy | live). */
 export function TileDetail({ k }: { k: string }) {
   const st = useStudio();
-  const s = st.s;
-  const t = s.tiles.find((x) => x.k === k);
+  const t = st.s.tiles.find((x) => x.k === k);
   if (!t) return null;
-  if (k === "build") {
-    const r = s.requirements;
-    return (
-      <>
-        <p className="st-dl">
-          <b>{r.text}</b>
-          {r.detail ? " · " + r.detail : ""}
-          {s.autopilot.text ? <span className="st-sub"> · {s.autopilot.text}</span> : null}
-        </p>
-        {r.note ? <p className="st-sub">{r.note}</p> : null}
-        {r.items.length ? (
-          <ul className="st-list st-reqs" data-testid="studio-requirements">
-            {r.items.map((x) => (
-              <li key={x.id} title={x.why || undefined}>
-                <span className={"ap-chip t-" + (x.tone || "n")}>{STATUS_WORD[x.status] || x.status}</span> {x.text}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p className="ap-none">No requirements yet.</p>
-        )}
-      </>
-    );
-  }
-  return (
-    <p className="st-dl">
-      <b>{t.v}</b>
-      {t.s ? " · " + t.s : ""}
-    </p>
-  );
+  return <TileDetailBody k={k} />;
 }
