@@ -721,6 +721,31 @@
   --oc-rgb: 251, 113, 85;
   --on: #fdba4d;
 }
+/* the Waiting tile glows brighter than its neighbours */
+.cf-oftile[data-of="queue"] {
+  border-color: rgba(var(--oc-rgb), 0.85);
+  background:
+    radial-gradient(120% 80% at 20% 70%, rgba(var(--oc-rgb), 0.2), transparent 62%),
+    linear-gradient(180deg, rgba(10, 30, 52, 0.6), rgba(4, 11, 22, 0.9));
+  box-shadow: inset 0 0 20px rgba(var(--oc-rgb), 0.24), 0 0 18px rgba(var(--oc-rgb), 0.42), 0 0 36px rgba(var(--oc-rgb), 0.18);
+}
+.cf-oftile[data-of="queue"]:hover {
+  border-color: rgba(var(--oc-rgb), 1);
+  box-shadow: inset 0 0 24px rgba(var(--oc-rgb), 0.3), 0 0 24px rgba(var(--oc-rgb), 0.55), 0 0 44px rgba(var(--oc-rgb), 0.24);
+}
+.cf-oftile[data-of="queue"] .cf-ofi {
+  border-color: rgba(var(--oc-rgb), 1);
+  box-shadow: 0 0 16px rgba(var(--oc-rgb), 0.7), inset 0 0 12px rgba(var(--oc-rgb), 0.45), 0 0 0 4px rgba(var(--oc-rgb), 0.14);
+}
+.cf-oftile[data-of="queue"] .cf-ofi svg {
+  filter: drop-shadow(0 0 5px rgba(var(--oc-rgb), 1));
+}
+.cf-oftile[data-of="queue"] .cf-ofn b {
+  text-shadow: 0 0 8px rgba(var(--oc-rgb), 0.9), 0 0 18px rgba(var(--oc-rgb), 0.6);
+}
+.cf-oftile[data-of="queue"] .cf-ofbar {
+  box-shadow: 0 0 8px rgba(var(--oc-rgb), 0.85);
+}
 .cf-ofl {
   color: #8fdcff;
   font-size: 12px;
