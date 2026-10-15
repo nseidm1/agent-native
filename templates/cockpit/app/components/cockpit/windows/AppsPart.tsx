@@ -5,6 +5,8 @@ import type { Tone } from "@shared/cockpit";
 
 import { READ_ONLY } from "../CardDialog";
 import type { WindowPartProps } from "./index";
+import { StudioView, type StudioData } from "./StudioView";
+import { Thumb, thumbSrc } from "./Thumb";
 import "./apps-part.css";
 
 type Tile = {
@@ -14,6 +16,8 @@ type Tile = {
   preview: string;
   previewTitle: string;
   previewSub: string;
+  thumb: string | null;
+  pilot: { text: string; tone: string; spin: boolean; open: boolean; title: string } | null;
   canStart: boolean;
   staging: string;
   stagingOn: boolean;
@@ -21,7 +25,7 @@ type Tile = {
   last: string;
   requests: { id: string; kind: string; title: string; line: string; tone?: Tone; fa?: string }[];
 };
-type PartData = { intro?: string; tiles?: Tile[]; hint?: string; requestHint?: string };
+type PartData = { intro?: string; tiles?: Tile[]; hint?: string; requestHint?: string; studio?: StudioData | null };
 type Msg = { ok: boolean; text: string } | null;
 
 /** The cockpit's own words for a refused write, without the framework's "Action <name> failed:" prefix. */
@@ -33,18 +37,24 @@ const slugN = (s: string) =>
     .replace(/^-+|-+$/g, "")
     .slice(0, 32);
 
-/** An app's studio is still the legacy page's (#apps=<id>): Cockpit opens it in its LegacyWindow. */
-export function openStudio(id: string, name: string) {
-  window.dispatchEvent(new CustomEvent("cockpit-open-legacy", { detail: { slug: "apps=" + id, label: name + " studio" } }));
+/** FA-19157: an app's studio is this window with args.app (rendered natively, never the legacy page). */
+export function studioOpener(setArgs: WindowPartProps["setArgs"]) {
+  return (id: string) => {
+    if (setArgs) setArgs({ app: id });
+    else window.dispatchEvent(new CustomEvent("cockpit-open-window", { detail: { id: "apps", args: { app: id } } }));
+  };
 }
+
 
 /**
  * FA-19129: the Apps picker's own part (the legacy appsDlg): a tile per app with its staging state in words, its open cards,
  * its release line and its requests; Open studio (the legacy studio, for now), Start staging for a stopped copy, a Request
  * form per app (apps.request) and the New app form (apps.new). Every write is the cockpit's, through the region's actions.
  */
-export function AppsPart({ d, canWrite, onDone }: WindowPartProps) {
+export function AppsPart({ d, canWrite, onDone, setArgs }: WindowPartProps) {
   const p = (d.part || {}) as PartData;
+  const openStudio = studioOpener(setArgs);
+  if (p.studio) return <StudioView s={p.studio} canWrite={canWrite} onDone={onDone} onBack={() => setArgs && setArgs({})} />;
   const tiles = p.tiles || [];
   const [reqFor, setReqFor] = useState<string | null>(null);
   return (
@@ -54,7 +64,7 @@ export function AppsPart({ d, canWrite, onDone }: WindowPartProps) {
       {tiles.length ? (
         <div className="ap-grid">
           {tiles.map((t) => (
-            <AppTile key={t.id} t={t} canWrite={canWrite} onDone={onDone} asking={reqFor === t.id} setAsking={(v) => setReqFor(v ? t.id : null)} requestHint={p.requestHint || ""} />
+            <AppTile key={t.id} t={t} openStudio={openStudio} canWrite={canWrite} onDone={onDone} asking={reqFor === t.id} setAsking={(v) => setReqFor(v ? t.id : null)} requestHint={p.requestHint || ""} />
           ))}
         </div>
       ) : (
@@ -64,7 +74,7 @@ export function AppsPart({ d, canWrite, onDone }: WindowPartProps) {
   );
 }
 
-function AppTile({ t, canWrite, onDone, asking, setAsking, requestHint }: { t: Tile; canWrite: boolean; onDone: () => void; asking: boolean; setAsking: (v: boolean) => void; requestHint: string }) {
+function AppTile({ t, openStudio, canWrite, onDone, asking, setAsking, requestHint }: { t: Tile; openStudio: (id: string) => void; canWrite: boolean; onDone: () => void; asking: boolean; setAsking: (v: boolean) => void; requestHint: string }) {
   const [msg, setMsg] = useState<Msg>(null);
   const start = useActionMutation<{ ok: boolean; answer?: any }, { app: string }>("cockpit-app-staging", {
     timeoutMs: 160_000,
@@ -77,7 +87,9 @@ function AppTile({ t, canWrite, onDone, asking, setAsking, requestHint }: { t: T
   const notFiled = t.requests.filter((r) => r.tone === "r").length;
   return (
     <article className={"ap-tile" + (asking ? " wide" : "")} data-app={t.id} aria-label={t.name}>
-      <div className="ap-pv" data-st={t.preview}>
+      <div className={"ap-pv" + (t.thumb ? " pic" : "")} data-st={t.preview}>
+        {t.thumb ? <Thumb src={thumbSrc(t.thumb)} /> : null}
+        <button type="button" className="ap-pv-go" onClick={() => openStudio(t.id)} aria-label={"Open the " + t.name + " studio (staging preview)"} />
         <span className="ap-pv-l">staging</span>
         {t.previewTitle ? <b className="ap-pv-t">{t.previewTitle}</b> : null}
         {t.previewSub ? <span className={"ap-pv-s" + (t.preview === "fail" || t.preview === "err" ? " why" : "")}>{t.previewSub}</span> : null}
@@ -97,7 +109,7 @@ function AppTile({ t, canWrite, onDone, asking, setAsking, requestHint }: { t: T
         ) : null}
       </div>
       <div className="ap-body">
-        <button type="button" className="ap-name" onClick={() => openStudio(t.id, t.name)} aria-label={"Open the " + t.name + " studio"}>
+        <button type="button" className="ap-name" onClick={() => openStudio(t.id)} aria-label={"Open the " + t.name + " studio"}>
           <b className="ap-n">{t.name}</b>
           <span className="ap-d">{t.desc}</span>
         </button>
@@ -105,6 +117,20 @@ function AppTile({ t, canWrite, onDone, asking, setAsking, requestHint }: { t: T
           <div className="ap-st">
             <span className={"ap-dot" + (t.stagingOn ? " on" : "")} aria-hidden="true" />
             <span>{t.staging}</span>
+          </div>
+        ) : null}
+        {t.pilot ? (
+          <div className="ap-pilot" role="status">
+            {t.pilot.open ? (
+              <button type="button" className={"ap-chip pilot t-" + (t.pilot.tone || "n")} title={t.pilot.title} aria-label={t.name + ": " + t.pilot.text + ", open the studio"} onClick={() => openStudio(t.id)}>
+                {t.pilot.text}
+              </button>
+            ) : (
+              <span className={"ap-chip pilot t-" + (t.pilot.tone || "n")} title={t.pilot.title}>
+                {t.pilot.spin ? <i className="ap-spin" aria-hidden="true" /> : null}
+                {t.pilot.text}
+              </span>
+            )}
           </div>
         ) : null}
         <div className="ap-chips">
@@ -136,7 +162,7 @@ function AppTile({ t, canWrite, onDone, asking, setAsking, requestHint }: { t: T
           <p className="ap-none">No requests yet.</p>
         )}
         <div className="ap-acts">
-          <button type="button" className="cp-btn sm" onClick={() => openStudio(t.id, t.name)}>
+          <button type="button" className="cp-btn sm" onClick={() => openStudio(t.id)}>
             Open studio
           </button>
           <button type="button" className="cp-btn sm ghost" aria-expanded={asking} onClick={() => setAsking(!asking)}>
@@ -338,3 +364,4 @@ function NewApp({ hint, canWrite, onDone }: { hint: string; canWrite: boolean; o
     </div>
   );
 }
+

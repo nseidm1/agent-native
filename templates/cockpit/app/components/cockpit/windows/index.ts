@@ -12,7 +12,8 @@ import { AppsPart } from "./AppsPart";
 import { QuestionsPart } from "./QuestionsPart";
 
 /** What a window's own part gets: its document, whether this viewer may write, and a refresh. */
-export type WindowPartProps = { d: WindowDetail; canWrite: boolean; onDone: () => void };
+/** setArgs re-reads the window with new args (FA-19157: the Apps window opens an app's studio with { app }). */
+export type WindowPartProps = { d: WindowDetail; canWrite: boolean; onDone: () => void; setArgs?: (args: Record<string, string>) => void };
 
 /**
  * FA-19087: a window's own interactive part (a composer, a form, a stepper), shown above its sections. Most windows

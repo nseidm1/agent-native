@@ -1,0 +1,284 @@
+/* FA-19157: an app's studio (StudioView.tsx), the legacy studio's face in the neon tokens. */
+.st-part {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.st-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  min-width: 0;
+}
+.st-sp {
+  flex: 1 1 auto;
+}
+.st-id {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  min-width: 0;
+  font-size: 12px;
+  color: var(--mute);
+}
+.st-id code {
+  font: 12px var(--mono);
+  color: var(--tx2);
+}
+.st-id a {
+  color: var(--sky);
+  text-decoration: none;
+}
+.st-id a:hover code {
+  color: var(--sky);
+  text-decoration: underline;
+}
+.st-inbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border: 1px solid rgba(76, 195, 255, 0.24);
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--tx2);
+}
+.st-inbox.need {
+  border-color: var(--amb);
+  color: var(--amb);
+  background: color-mix(in srgb, var(--amb) 10%, transparent);
+  box-shadow: 0 0 10px color-mix(in srgb, var(--amb) 25%, transparent);
+}
+
+/* the lifecycle bar */
+.st-tiles {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+.st-tile {
+  all: unset;
+  box-sizing: border-box;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  min-height: 62px;
+  padding: 8px 10px;
+  border: 1px solid rgba(76, 195, 255, 0.24);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(8, 21, 37, 0.92), rgba(4, 11, 22, 0.92));
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.st-tile:hover {
+  border-color: rgba(76, 195, 255, 0.5);
+}
+.st-tile:focus-visible {
+  outline: 2px solid var(--sky);
+  outline-offset: 2px;
+}
+.st-tile[aria-expanded="true"] {
+  border-color: var(--sky);
+  box-shadow: 0 0 14px rgba(76, 195, 255, 0.22), inset 0 0 12px rgba(76, 195, 255, 0.08);
+}
+.st-tile.need {
+  border-color: var(--amb);
+  box-shadow: inset 0 0 0 1px var(--amb), 0 0 12px color-mix(in srgb, var(--amb) 22%, transparent);
+}
+.st-tile .k {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font: 600 9.5px/1.3 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.st-tile .k .ap-chip {
+  letter-spacing: 0.04em;
+  font-size: 9.5px;
+  line-height: 14px;
+}
+.st-tile .v {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--title);
+  overflow-wrap: anywhere;
+}
+.st-tile .s {
+  font-size: 11px;
+  color: var(--mute);
+  overflow-wrap: anywhere;
+}
+.st-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--dim);
+}
+.st-dot.t-g {
+  background: var(--em);
+  box-shadow: 0 0 6px var(--em);
+}
+.st-dot.t-a {
+  background: var(--amb);
+  box-shadow: 0 0 6px var(--amb);
+}
+.st-dot.t-r {
+  background: var(--red);
+  box-shadow: 0 0 6px var(--red);
+}
+.st-dot.t-s {
+  background: var(--sky);
+  box-shadow: 0 0 6px var(--sky);
+}
+.st-detail {
+  padding: 10px 12px;
+  border: 1px solid rgba(76, 195, 255, 0.3);
+  border-radius: 10px;
+  background: rgba(4, 11, 22, 0.85);
+  min-width: 0;
+}
+.st-dl {
+  margin: 0 0 6px;
+  font-size: 12.5px;
+  color: var(--tx2);
+}
+.st-dl b {
+  color: var(--tx);
+}
+.st-sub {
+  font-size: 11.5px;
+  color: var(--mute);
+  overflow-wrap: anywhere;
+}
+p.st-sub {
+  margin: 0 0 6px;
+}
+
+/* the staging app and the changes */
+.st-main {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 12px;
+  min-width: 0;
+}
+.st-h {
+  margin: 0 0 6px;
+  font: 600 10px/1.3 var(--mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sky);
+}
+.st-pic {
+  position: relative;
+  aspect-ratio: 16 / 10;
+  border: 1px solid rgba(76, 195, 255, 0.24);
+  border-radius: 10px;
+  overflow: hidden;
+  background:
+    linear-gradient(rgba(76, 195, 255, 0.05) 1px, transparent 1px) 0 0 / 100% 14px,
+    linear-gradient(90deg, rgba(76, 195, 255, 0.05) 1px, transparent 1px) 0 0 / 14px 100%,
+    var(--deep);
+  box-shadow: 0 0 18px rgba(76, 195, 255, 0.1);
+}
+.st-pic[data-st="stopped"] .ap-pv-img.on,
+.st-pic[data-st="fail"] .ap-pv-img.on {
+  opacity: 0.28;
+}
+.st-pic-o {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 12px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--tx2);
+}
+.st-pic-o b {
+  font-size: 13px;
+  color: var(--tx);
+}
+.st-pic-o .why {
+  color: var(--amb);
+}
+.st-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  min-width: 0;
+}
+.st-row .st-sub {
+  flex: 1 1 200px;
+}
+.st-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--tx2);
+  min-width: 0;
+}
+.st-list li {
+  overflow-wrap: anywhere;
+  padding-bottom: 5px;
+  border-bottom: 1px dashed rgba(76, 195, 255, 0.12);
+}
+.st-list li b {
+  color: var(--tx);
+  font-weight: 600;
+}
+.st-reqs {
+  max-height: 320px;
+  overflow: auto;
+}
+.st-when {
+  display: block;
+  font: 10.5px var(--mono);
+  color: var(--dim);
+}
+.st-act {
+  margin-top: 10px;
+}
+.st-act summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--sky);
+}
+.st-act .st-list {
+  margin-top: 8px;
+  max-height: 260px;
+  overflow: auto;
+}
+
+@media (max-width: 640px) {
+  .st-tiles {
+    display: flex;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    padding-bottom: 2px;
+  }
+  .st-tile {
+    flex: 0 0 42%;
+    scroll-snap-align: start;
+  }
+  .st-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -8,6 +8,7 @@
  *   readNative(np)    the same readings from the agent-native window
  *   compare(L, N)     differences, as sentences ([] = parity)
  *   writes?(np, check, { width })   optional, 1280 only: a write that round-trips through the client
+ *   window?, shot?    optional: the agent-native window id it opens (default id) and the screenshot name (default id)
  * At 1280 and 390, side by side on the same data (re-read up to four times, a few seconds apart, for a live
  * reading that moved between the reads): parity, no legacy frame in the agent-native window, no sideways
  * scroll, and screenshots of both into <shots>/windows/<id>-<width>-{legacy,agent-native}.png.
@@ -46,7 +47,7 @@ export async function runWindows({ browser, windows, base, legacyUrl, outDir, ch
       try {
         await w.openLegacy(lp, { width });
         await w.openNative(np, { width });
-        const win = np.locator(`[data-testid=cf-window][data-window=${w.id}]`);
+        const win = np.locator(`[data-testid=cf-window][data-window=${w.window || w.id}]`);
         const native = (await win.count()) > 0 && (await np.locator("[data-testid=cf-legacy]").count()) === 0;
         check(`${tag}: opens in agent-native (its own window, no legacy frame)`, native);
         let L, N, diffs = ["not read"];
@@ -57,8 +58,8 @@ export async function runWindows({ browser, windows, base, legacyUrl, outDir, ch
         }
         check(`${tag}: the same readings as the legacy window`, !diffs.length, diffs.slice(0, 6).join("; "));
         check(`${tag}: no sideways scroll`, (await np.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 0);
-        await lp.screenshot({ path: path.join(dir, `${w.id}-${width}-legacy.png`) });
-        await np.screenshot({ path: path.join(dir, `${w.id}-${width}-agent-native.png`) });
+        await lp.screenshot({ path: path.join(dir, `${w.shot || w.id}-${width}-legacy.png`) });
+        await np.screenshot({ path: path.join(dir, `${w.shot || w.id}-${width}-agent-native.png`) });
         if (writes && !phone && w.writes) {
           // a write proves itself (its own checks); a refusal it provokes on purpose is not a page error
           const n0 = errs.length;

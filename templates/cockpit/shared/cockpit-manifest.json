@@ -152,6 +152,22 @@
   {
    "name": "appdialog",
    "description": "The Apps picker: each app's staging (exists, built, running) and picture state (apps.staging starts staging)."
+  },
+  {
+   "name": "apps/{app}/env",
+   "description": "One app's environments: staging (sha, built, running, url, the commits ahead), production (sha, url, when), the promotion in flight and the autopilot (state, text, decisions open). A read never starts staging."
+  },
+  {
+   "name": "apps/{app}/lifecycle",
+   "description": "One app's lifecycle bar: build (requirements progress, autopilot), quality (QA findings, the newest measurement), launch (% ready, items left), live (production KPIs, alerts), the optimizer lenses and the inbox counts."
+  },
+  {
+   "name": "apps/{app}/checklist",
+   "description": "One app's definition of done: progress (total, verified, failing, pending, text, detail) and each requirement with its check and verdict (the newest 200)."
+  },
+  {
+   "name": "apps/{app}/studio",
+   "description": "One app's studio view (the legacy studio's GET): the app card, readiness, the flow's next steps, the staging changes, the record's questions, asks and activity, the estimate. Bounded."
   }
  ],
  "actions": [

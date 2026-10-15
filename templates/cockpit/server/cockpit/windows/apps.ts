@@ -3,13 +3,16 @@
  * tilePaint, stagePrev/prevPaint, stageLine, cardLine). One tile per registered app: its name and description, the staging
  * preview's state in words (the client has no image route, so no picture), the staging line, its open-card chips, its last
  * release and folder line, and its requests with how each was filed. The tiles, the New app form and each app's Request form
- * are the window's part (app/components/cockpit/windows/AppsPart.tsx), drawn from `part`; the studio itself opens on the
- * legacy page (#apps=<id>) until it is ported.
+ * are the window's part (app/components/cockpit/windows/AppsPart.tsx), drawn from `part`.
+ * FA-19157: each tile shows its staging PICTURE (the region's /cards/app-thumb route, read through the client's image route)
+ * and the autopilot / definition-of-done chip (studio-pilot.js tileChip over apps/<id>/env and apps/<id>/checklist); with
+ * args.app the same window is that app's STUDIO (part.studio, ./studio.ts), opened natively from Open studio or #apps=<id>.
  */
 import type { Tone } from "../../../shared/cockpit.js";
 import type { DetailSection } from "../../../shared/cockpit-detail.js";
 import type { WindowDetail } from "../../../shared/cockpit-windows.js";
-import { getMany } from "../client.js";
+import { APP_ID, getMany, thumbShaOf } from "../client.js";
+import { activityOf, changesOf, identityOf, inboxOf, lifeTiles, requirementsOf, stagingOf, tileChip, type Identity, type LifeTile, type PilotChip, type Requirement, type StudioStaging } from "./studio.js";
 import type { WindowBuilder } from "./registry.js";
 
 type Req = { id: string; at?: string; kind?: string; title?: string; route?: string; status?: string; why?: string; reason?: string; fa?: string };
@@ -27,6 +30,10 @@ export interface AppTile {
   preview: string;
   previewTitle: string;
   previewSub: string;
+  /** FA-19157: the staging picture, a path under the region's base (app-thumb/<app>/<sha12>.jpg), or null */
+  thumb: string | null;
+  /** FA-19157: the autopilot / definition-of-done chip (studio-pilot.js tileChip), or null when the app has no checklist */
+  pilot: PilotChip | null;
   /** the Start button shows for a stopped staging copy */
   canStart: boolean;
   staging: string;
@@ -35,7 +42,26 @@ export interface AppTile {
   last: string;
   requests: { id: string; kind: string; title: string; line: string; tone?: Tone; fa?: string }[];
 }
+/** FA-19157: one app's studio, as the part draws it. */
+export interface StudioPart {
+  app: string;
+  name: string;
+  chip: string;
+  platform: string;
+  identity: Identity;
+  inbox: { need: number; proposals: number; text: string };
+  tiles: LifeTile[];
+  staging: StudioStaging;
+  thumb: string | null;
+  preview: string;
+  requirements: { text: string; detail: string; note: string; items: Requirement[] };
+  changes: { id: string; what: string; state: string; at: string; tone: Tone | "" }[];
+  activity: { at: string; text: string }[];
+  autopilot: { state: string; text: string };
+  errors: string[];
+}
 export interface AppsPartData {
+  studio?: StudioPart | null;
   intro: string;
   tiles: AppTile[];
   hint: string;
@@ -55,16 +81,22 @@ const whenS = (iso: string | null | undefined) => {
 };
 const pl = (n: number, w: string) => n + " " + w + (n === 1 ? "" : "s");
 
-/** The legacy stagePrev, in words: the picture itself is not on the client. */
+/** The region path of an app's staging picture (thumb.url names <sha12>.jpg), or null. */
+export const thumbOf = (a: DialogApp): string | null => {
+  const sha = a.thumb ? thumbShaOf(a.thumb.url) : null;
+  return sha && APP_ID.test(a.id) ? "app-thumb/" + a.id + "/" + sha + ".jpg" : null;
+};
+/** The legacy stagePrev and its overlay words (apps.js prevPaint): the picture shows under a live preview, dimmed under stopped / failed. */
 export function previewOf(a: DialogApp, dErr: boolean): { state: string; title: string; sub: string } {
   const s = a.staging,
-    t = a.thumb || {};
+    t = a.thumb || {},
+    pic = !!thumbOf(a);
   if (!s) return dErr ? { state: "err", title: "Staging status unavailable", sub: "" } : { state: "wait", title: "", sub: "" };
   if (!s.exists && !s.sha) return { state: "none", title: "No staging copy yet", sub: "The staging copy is cut when the studio first opens it." };
   if (!s.running) return { state: "stopped", title: "Staging not running", sub: "Start it to see the " + (a.name || a.id) + " staging homepage here." };
-  if (t.state === "ready") return { state: "live", title: "Staging preview ready", sub: "The picture opens in the studio; it is not shown here yet." };
+  if (t.state === "ready") return { state: "live", title: "", sub: "" };
   if (t.state === "failed") return { state: "fail", title: "The preview did not render", sub: t.why || "the picture was not taken" };
-  return { state: "rendering", title: "Rendering the preview…", sub: "" };
+  return { state: "rendering", title: pic ? "" : "Rendering the preview…", sub: "" };
 }
 
 /** The legacy stageLine. */
@@ -108,7 +140,8 @@ export function requestLine(r: Req): { line: string; tone?: Tone } {
 }
 
 /** The pure half: board.apps (cards, requests) + appdialog (staging, thumb) -> the window. */
-export function appsWindow(A: BoardApps, D: AppDialog, at: number, ok: boolean, error?: string): WindowDetail {
+export type Pilots = Record<string, { ap: any; p: any } | undefined>;
+export function appsWindow(A: BoardApps, D: AppDialog, at: number, ok: boolean, error?: string, pilots: Pilots = {}, studio: StudioPart | null = null): WindowDetail {
   const dErr = D && D.ok === false ? D.error || "not answering" : !D ? "not answering" : "";
   const byD = new Map((D && D.apps ? D.apps : []).map((a) => [a.id, a]));
   const base: DialogApp[] = A && A.list ? A.list : D && D.apps ? D.apps : [];
@@ -126,6 +159,8 @@ export function appsWindow(A: BoardApps, D: AppDialog, at: number, ok: boolean, 
       preview: p.state,
       previewTitle: p.title,
       previewSub: p.sub,
+      thumb: p.state === "none" || p.state === "wait" || p.state === "err" ? null : thumbOf(a),
+      pilot: pilots[a.id] ? tileChip(pilots[a.id]!.ap, pilots[a.id]!.p) : null,
       canStart: p.state === "stopped",
       staging: stagingLine(a, dErr),
       stagingOn: !!(a.staging && a.staging.running),
@@ -138,16 +173,9 @@ export function appsWindow(A: BoardApps, D: AppDialog, at: number, ok: boolean, 
     };
   });
   const notFiled = tiles.reduce((s, t) => s + t.requests.filter((r) => r.tone === "r").length, 0);
-  const sections: DetailSection[] = [
-    {
-      title: "Not shown here yet",
-      kind: "text",
-      collapsed: true,
-      text:
-        "The staging preview pictures (the cockpit client has no image route, so each tile says the picture's state in words), the studio autopilot and checklist chip on each tile (the studio's env and QA endpoints are not on the client), and the studio itself, which opens on the legacy page.",
-    },
-  ];
+  const sections: DetailSection[] = [];
   const part: AppsPartData = {
+    studio,
     intro:
       "Pick an app to open its studio. What you ask for there builds the app's staging copy, pictured on each card; only Promote to production turns staging changes into cards. A card belongs to an app when the change it describes is inside that app's folder; every other card is system work.",
     tiles,
@@ -155,6 +183,20 @@ export function appsWindow(A: BoardApps, D: AppDialog, at: number, ok: boolean, 
     requestHint:
       "Your request is filed into Backlog as a card: it gets its exact change before any draft, and is drafted during this app's production run (Promote to production).",
   };
+  if (studio)
+    return {
+      id: "apps",
+      title: studio.name,
+      tone: studio.inbox.need ? "a" : studio.errors.length ? "a" : "g",
+      headline: "app studio",
+      sub: "",
+      chips: [{ t: studio.chip, tone: "g" }],
+      at,
+      ok,
+      error,
+      part: part as unknown as Record<string, unknown>,
+      sections,
+    };
   return {
     id: "apps",
     title: "Apps",
@@ -170,11 +212,55 @@ export function appsWindow(A: BoardApps, D: AppDialog, at: number, ok: boolean, 
   };
 }
 
-const build: WindowBuilder = async () => {
+/** FA-19157: one app's studio from its client reads (the pure half is ./studio.ts). */
+export function studioPart(app: DialogApp, env: any, lc: any, cl: any, sv: any, qs: any, errors: string[], now = Date.now()): StudioPart {
+  const p = previewOf({ ...app, staging: app.staging || (env && env.staging) || null }, false);
+  const ap = (env && env.autopilot) || {};
+  return {
+    app: app.id,
+    name: app.name || app.id,
+    chip: (app.platform && app.platform !== "web" ? app.platform[0].toUpperCase() + app.platform.slice(1) + " app" : "App") + " · " + (app.dirs || []).join(", "),
+    platform: app.platform || "web",
+    identity: identityOf(env, now),
+    inbox: inboxOf(lc, env, qs, app.id),
+    tiles: lifeTiles(lc, env, now),
+    staging: stagingOf(env),
+    thumb: thumbOf(app),
+    preview: p.state,
+    requirements: requirementsOf(cl),
+    changes: changesOf(sv),
+    activity: activityOf(sv),
+    autopilot: { state: String(ap.state || "off"), text: String(ap.text || "") },
+    errors,
+  };
+}
+
+const build: WindowBuilder = async (args) => {
   try {
     const r = await getMany(["board", "appdialog"]);
     const b = r.data.board;
-    return appsWindow(b && b.apps ? b.apps : null, r.data.appdialog, r.at, r.ok, r.ok ? undefined : r.errors.join("; "));
+    const A: BoardApps = b && b.apps ? b.apps : null;
+    const D: AppDialog = r.data.appdialog;
+    const ids = [...new Set([...((A && A.list) || []), ...((D && D.apps) || [])].map((a) => a.id).filter((id) => APP_ID.test(id)))];
+    const want = typeof args.app === "string" && ids.includes(args.app) ? args.app : null;
+    const names = ids.flatMap((id) => ["apps/" + id + "/env", "apps/" + id + "/checklist"]);
+    if (want) names.push("apps/" + want + "/lifecycle", "apps/" + want + "/studio", "questions");
+    const x = await getMany(names);
+    const pilots: Pilots = {};
+    for (const id of ids) {
+      const env = x.data["apps/" + id + "/env"],
+        cl = x.data["apps/" + id + "/checklist"];
+      if (cl) pilots[id] = { ap: env && env.autopilot, p: cl.progress };
+    }
+    let studio: StudioPart | null = null;
+    if (want) {
+      const a = { ...(((D && D.apps) || []).find((y) => y.id === want) || { id: want }), ...(((A && A.list) || []).find((y) => y.id === want) || {}) } as DialogApp;
+      const d = ((D && D.apps) || []).find((y) => y.id === want);
+      if (d) Object.assign(a, { staging: d.staging, thumb: d.thumb });
+      studio = studioPart(a, x.data["apps/" + want + "/env"], x.data["apps/" + want + "/lifecycle"], x.data["apps/" + want + "/checklist"], x.data["apps/" + want + "/studio"], x.data.questions, x.errors.filter((e) => e.includes(want) || e.startsWith("questions")));
+    }
+    const errs = [...r.errors, ...(want ? [] : [])];
+    return appsWindow(A, D, r.at, r.ok, r.ok ? undefined : errs.join("; "), pilots, studio);
   } catch (e) {
     return appsWindow(null, null, Date.now(), false, e instanceof Error ? e.message : String(e));
   }

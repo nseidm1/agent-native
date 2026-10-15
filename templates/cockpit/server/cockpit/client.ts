@@ -410,3 +410,36 @@ export function __resetClientForTests() {
   inflight.clear();
   manifestCache = null;
 }
+
+// ---------- the staging pictures (FA-19157) ----------
+export const APP_ID = /^[a-z][a-z0-9-]{0,40}$/;
+export const THUMB_SHA = /^[0-9a-f]{12}$/;
+/** An app's staging picture at a staging sha: the JPEG bytes, or null when the cockpit has none. By strict name only. */
+export function getAppThumb(app: string, sha12: string): Promise<Buffer | null> {
+  if (!APP_ID.test(app) || !THUMB_SHA.test(sha12)) return Promise.reject(new ClientError("bad picture name", 400));
+  const u = new URL(origin());
+  const path = prefix() + "/images/app-thumb/" + app + "/" + sha12 + ".jpg";
+  return new Promise((resolve, reject) => {
+    const req = http.request({ host: u.hostname, port: u.port || 80, path, method: "GET", timeout: READ_TIMEOUT_MS, headers: { host: u.host, accept: "image/jpeg", "user-agent": "cockpit-region (agent-native)" } }, (res) => {
+      const chunks: Buffer[] = [];
+      let n = 0;
+      res.on("data", (c: Buffer) => {
+        n += c.length;
+        if (n <= 8_000_000) chunks.push(c);
+      });
+      res.on("end", () => {
+        if (res.statusCode === 404) return resolve(null);
+        if (res.statusCode !== 200 || n > 8_000_000) return reject(new ClientError("the staging picture answered " + res.statusCode, res.statusCode || 502));
+        resolve(Buffer.concat(chunks));
+      });
+    });
+    req.on("timeout", () => req.destroy(new Error("the cockpit did not answer within " + Math.round(READ_TIMEOUT_MS / 1000) + " s")));
+    req.on("error", (e) => reject(e instanceof ClientError ? e : new ClientError("cockpit unreachable: " + e.message, 502)));
+    req.end();
+  });
+}
+/** The sha12 a cockpit picture url names (appdialog thumb.url ends in <sha12>.jpg), or null. */
+export const thumbShaOf = (url: unknown): string | null => {
+  const m = /\/([0-9a-f]{12})\.jpg$/.exec(String(url || ""));
+  return m ? m[1] : null;
+};

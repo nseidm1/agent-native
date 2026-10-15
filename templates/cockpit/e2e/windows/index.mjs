@@ -11,7 +11,8 @@ import push from "./push.mjs";
 import queue from "./queue.mjs";
 
 import apps from "./apps.mjs";
+import studio from "./studio.mjs";
 import issues from "./issues.mjs";
 import questions from "./questions.mjs";
 
-export const WINDOWS = [push, overview, agents, queue, account, master, phone, jev, halosave, balancer, apps, questions, issues];
+export const WINDOWS = [push, overview, agents, queue, account, master, phone, jev, halosave, balancer, apps, studio, questions, issues];

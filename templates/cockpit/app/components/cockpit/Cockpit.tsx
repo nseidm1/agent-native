@@ -50,6 +50,7 @@ export function Cockpit() {
   const [cardOpen, setCardOpen] = useState<CardId | null>(null);
   const [legacy, setLegacy] = useState<LegacyTarget | null>(null);
   const [win, setWin] = useState<WindowId | null>(null);
+  const [winArgs, setWinArgs] = useState<Record<string, string>>({});
   const opener = useRef<HTMLElement | null>(null);
   const [glance, setGlance] = useState(false);
   useEffect(() => {
@@ -81,30 +82,38 @@ export function Cockpit() {
   const open = useCallback((o: Opens, el: HTMLElement) => {
     opener.current = el;
     if ("card" in o) setCardOpen(o.card);
-    else if (isNativeWindow(o.legacy)) setWin(o.legacy);
+    else if (isNativeWindow(o.legacy)) {
+      setWinArgs({});
+      setWin(o.legacy);
+    }
     else setLegacy({ slug: o.legacy, label: LEGACY_LABEL[o.legacy] || o.legacy });
   }, []);
   const openHeader = useCallback((o: HeaderOpen) => {
     if ("href" in o) window.open(o.href, "_blank", "noopener");
     else if (isNativeWindow(HEADER_WINDOWS[o.button])) {
       opener.current = document.activeElement as HTMLElement | null;
+      setWinArgs({});
       setWin(HEADER_WINDOWS[o.button]);
     } else setLegacy({ button: o.button, label: o.label });
   }, []);
   const refresh = useCallback(() => void qc.invalidateQueries(), [qc]);
-  // FA-19129/FA-19134: the windows' own openers - #questions (#questions/<id>), #issues and #apps open the native windows,
-  // #apps=<id> an app's studio (still the legacy page's); a window's part opens another window or the legacy studio by event
+  // FA-19129/FA-19134: the windows' own openers - #questions (#questions/<id>), #issues and #apps open the native windows;
+  // FA-19157: #apps=<id> opens that app's studio natively (the Apps window with { app }); a window's part opens another window by event
   useEffect(() => {
     const fromHash = () => {
       const h = window.location.hash;
       const app = /^#apps=([\w-]+)$/.exec(h);
       if (app) {
-        setWin(null);
-        setLegacy({ slug: "apps=" + app[1], label: "App studio" });
+        setLegacy(null);
+        setWinArgs({ app: app[1] });
+        setWin("apps");
         return;
       }
       const m = /^#(questions|issues|apps)(?:\/cq-[a-z0-9]+)?$/.exec(h);
-      if (m && isNativeWindow(m[1])) setWin(m[1]);
+      if (m && isNativeWindow(m[1])) {
+        setWinArgs({});
+        setWin(m[1]);
+      }
     };
     const onLegacy = (e: Event) => {
       const d = (e as CustomEvent<{ slug?: string; label?: string }>).detail;
@@ -114,8 +123,11 @@ export function Cockpit() {
       }
     };
     const onWin = (e: Event) => {
-      const d = (e as CustomEvent<{ id?: string }>).detail;
-      if (d && isNativeWindow(d.id)) setWin(d.id);
+      const d = (e as CustomEvent<{ id?: string; args?: Record<string, string> }>).detail;
+      if (d && isNativeWindow(d.id)) {
+        setWinArgs(d.args && typeof d.args === "object" ? d.args : {});
+        setWin(d.id);
+      }
     };
     fromHash();
     window.addEventListener("hashchange", fromHash);
@@ -171,8 +183,10 @@ export function Cockpit() {
       <BoardDialog card={cardOpen === "board" ? face("board") : null} onClose={() => setCardOpen(null)} returnTo={opener.current} />
       <WindowDialog
         id={win}
+        args={winArgs}
         onClose={() => {
           setWin(null);
+          setWinArgs({});
           clearHash();
           refresh();
         }}
