@@ -601,33 +601,111 @@
 }
 
 /* ---------- office ---------- */
+/* FA-19080 office restyle: a cut-corner neon frame, a big OFFICE title, and tiles with a ringed line icon,
+   the label above and the number in the tile's tone (g green, a amber, r red, d idle sky). */
 .cf-office {
+  container: cfoffice / inline-size;
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px;
+  gap: 10px;
+  padding: 12px 12px 16px;
   border-radius: 14px;
-  border: 1px solid var(--edge);
-  background: rgba(4, 11, 22, 0.85);
-  box-shadow: inset 0 0 24px rgba(76, 195, 255, 0.05), 0 0 18px rgba(76, 195, 255, 0.08);
+  border: 1.5px solid rgba(76, 195, 255, 0.7);
+  background:
+    linear-gradient(rgba(76, 195, 255, 0.03) 1px, transparent 1px) 0 0 / 22px 22px,
+    linear-gradient(90deg, rgba(76, 195, 255, 0.03) 1px, transparent 1px) 0 0 / 22px 22px,
+    radial-gradient(120% 70% at 50% 0%, rgba(76, 195, 255, 0.1), transparent 60%),
+    rgba(3, 9, 18, 0.92);
+  box-shadow:
+    0 0 0 1px rgba(76, 195, 255, 0.12),
+    0 0 22px rgba(76, 195, 255, 0.28),
+    inset 0 0 28px rgba(76, 195, 255, 0.1);
   cursor: pointer;
   min-width: 0;
 }
+.cf-office::before,
+.cf-office::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 34%;
+  height: 3px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, transparent, var(--sky), transparent);
+  filter: drop-shadow(0 0 4px rgba(76, 195, 255, 0.9));
+  pointer-events: none;
+}
+.cf-office::before {
+  top: 0;
+}
+.cf-office::after {
+  bottom: 0;
+  height: 4px;
+  width: 16%;
+  background: repeating-linear-gradient(115deg, var(--sky) 0 3px, transparent 3px 6px);
+}
 .cf-ofh {
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  justify-content: center;
   gap: 10px;
+  padding: 4px 8px 10px;
+  border-bottom: 1px solid rgba(76, 195, 255, 0.28);
+  box-shadow: 0 1px 0 rgba(76, 195, 255, 0.08);
+  min-width: 0;
+}
+.cf-oflock {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  margin-right: auto;
+  color: var(--sky);
+  border: 1px solid rgba(76, 195, 255, 0.45);
+  clip-path: polygon(25% 0, 75% 0, 100% 50%, 75% 100%, 25% 100%, 0 50%);
+  background: rgba(76, 195, 255, 0.08);
+}
+.cf-oflock svg,
+.cf-ofring svg {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.cf-oflock svg {
+  width: 15px;
+  height: 15px;
+  filter: drop-shadow(0 0 3px rgba(76, 195, 255, 0.8));
+}
+.cf-ofdots {
+  flex: none;
+  width: 26px;
+  height: 18px;
+  margin-left: auto;
+  background: radial-gradient(circle, rgba(76, 195, 255, 0.55) 1px, transparent 1.5px) 0 0 / 5px 5px;
 }
 .cf-oft {
-  color: var(--title);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.14em;
+  color: #7fe0ff;
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+  text-shadow: 0 0 8px rgba(76, 195, 255, 0.85), 0 0 22px rgba(76, 195, 255, 0.45);
 }
 .cf-ofs {
-  color: var(--mute);
-  font-size: 12px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #7fe0ff;
+  font-size: 14px;
+  font-weight: 600;
+  text-shadow: 0 0 8px rgba(76, 195, 255, 0.55);
 }
 .cf-oftiles {
   flex: 1;
@@ -637,75 +715,169 @@
   gap: 8px;
 }
 .cf-oftile {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
+  --tc: #4cc3ff;
+  --tn: #7fd8ff;
+  --tg: rgba(76, 195, 255, 0.55);
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas: "lab" "ring" "num" "bar";
+  justify-items: center;
+  align-content: center;
+  gap: 5px;
+  min-width: 0;
   min-height: 92px;
-  padding: 8px 4px;
+  padding: 8px 6px 7px;
   border-radius: 10px;
-  border: 1px solid rgba(76, 195, 255, 0.24);
-  background: linear-gradient(180deg, rgba(10, 30, 52, 0.55), rgba(4, 11, 22, 0.85));
-  box-shadow: inset 0 0 16px rgba(76, 195, 255, 0.06);
+  border: 1px solid color-mix(in srgb, var(--tc) 45%, transparent);
+  background:
+    linear-gradient(135deg, transparent 62%, color-mix(in srgb, var(--tc) 7%, transparent) 62% 63%, transparent 63%),
+    linear-gradient(180deg, rgba(10, 30, 52, 0.6), rgba(3, 9, 18, 0.9));
+  box-shadow: inset 0 0 18px color-mix(in srgb, var(--tc) 10%, transparent), 0 0 10px color-mix(in srgb, var(--tc) 12%, transparent);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .cf-oftile:hover {
-  border-color: var(--edge-hi);
-  box-shadow: 0 0 14px rgba(76, 195, 255, 0.2);
+  border-color: var(--tc);
+  box-shadow: inset 0 0 18px color-mix(in srgb, var(--tc) 14%, transparent), 0 0 16px color-mix(in srgb, var(--tc) 35%, transparent);
 }
-.cf-ofn {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-  white-space: nowrap;
+.cf-oftile.t-g {
+  --tc: #34d399;
+  --tn: #6ee7b7;
+  --tg: rgba(52, 211, 153, 0.6);
+}
+.cf-oftile.t-a {
+  --tc: #fbbf24;
+  --tn: #fcd34d;
+  --tg: rgba(251, 191, 36, 0.55);
+}
+.cf-oftile.t-r,
+.cf-oftile.t-a[data-of="refusals"] {
+  --tc: #f87171;
+  --tn: #fb923c;
+  --tg: rgba(249, 115, 22, 0.6);
+}
+.cf-oftile.t-r {
+  --tn: #fca5a5;
+}
+.cf-ofl {
+  grid-area: lab;
+  max-width: 100%;
+  color: color-mix(in srgb, var(--tn) 70%, #d6f1ff);
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+}
+.cf-ofring {
+  grid-area: ring;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  color: var(--tc);
+  border: 1.5px solid var(--tc);
+  background: radial-gradient(circle, color-mix(in srgb, var(--tc) 14%, transparent), transparent 70%);
+  box-shadow: 0 0 10px var(--tg), inset 0 0 8px color-mix(in srgb, var(--tc) 25%, transparent), 0 0 0 4px rgba(3, 9, 18, 0.9), 0 0 0 5px color-mix(in srgb, var(--tc) 25%, transparent);
+}
+.cf-ofring svg {
+  width: 21px;
+  height: 21px;
+  filter: drop-shadow(0 0 2px var(--tg));
 }
 .cf-ofi {
   font-size: 17px;
 }
+.cf-ofn {
+  grid-area: num;
+  display: inline-flex;
+  align-items: baseline;
+  gap: 1px;
+  max-width: 100%;
+  white-space: nowrap;
+  color: var(--tn);
+  text-shadow: 0 0 10px var(--tg);
+}
 .cf-ofn b {
   font-size: 22px;
-  font-weight: 700;
-  color: #9fe3ff;
-  text-shadow: 0 0 10px rgba(76, 195, 255, 0.55);
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 .cf-ofn small {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--tx2);
-}
-.cf-oftile.t-g .cf-ofn b {
-  color: #6ee7b7;
-  text-shadow: 0 0 10px rgba(52, 211, 153, 0.55);
-}
-.cf-oftile.t-a .cf-ofn b {
-  color: #fcd34d;
-  text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
-}
-.cf-oftile.t-r .cf-ofn b {
-  color: #fca5a5;
-}
-.cf-oftile.t-d .cf-ofn b {
-  color: #7fa9c6;
   text-shadow: none;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cf-ofn small.join {
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 1;
+  color: inherit;
+  text-shadow: inherit;
+}
+.cf-ofbar {
+  grid-area: bar;
+  width: 46px;
+  height: 2px;
+  background:
+    linear-gradient(90deg, var(--tc) 0 45%, transparent 45% 55%, color-mix(in srgb, var(--tc) 50%, transparent) 55% 62%, transparent 62% 72%, color-mix(in srgb, var(--tc) 50%, transparent) 72% 79%, transparent 79%);
+  opacity: 0.85;
+  filter: drop-shadow(0 0 2px var(--tg));
+}
+.cf-oftile.t-d .cf-ofring,
+.cf-oftile.t-d .cf-ofn {
+  opacity: 0.85;
+}
+/* a wide office: the mockup's ring on the left and the number on the right, a bigger title */
+@container cfoffice (min-width: 440px) {
+  .cf-oft {
+    font-size: 40px;
+  }
+  .cf-ofs {
+    font-size: 22px;
+  }
+  .cf-oftile {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas: "lab lab" "ring num" "ring bar";
+    justify-items: end;
+    column-gap: 10px;
+    min-height: 118px;
+    padding: 10px 12px;
+  }
+  .cf-ofl {
+    justify-self: center;
+    font-size: 13px;
+  }
+  .cf-ofring {
+    justify-self: start;
+    width: 56px;
+    height: 56px;
+  }
+  .cf-ofring svg {
+    width: 30px;
+    height: 30px;
+  }
+  .cf-ofn b,
+  .cf-ofn small.join {
+    font-size: 30px;
+  }
 }
 .cf-oftile.live {
   animation: cfLive 2.4s ease-in-out infinite;
 }
 @keyframes cfLive {
   50% {
-    box-shadow: 0 0 16px rgba(52, 211, 153, 0.25), inset 0 0 16px rgba(52, 211, 153, 0.08);
+    box-shadow: 0 0 18px var(--tg), inset 0 0 18px color-mix(in srgb, var(--tc) 14%, transparent);
   }
 }
 @media (prefers-reduced-motion: reduce) {
   .cf-oftile.live {
     animation: none;
   }
-}
-.cf-ofl {
-  color: var(--tx2);
-  font-size: 11.5px;
-  font-weight: 600;
-  text-align: center;
 }
 .cf-ofnote {
   color: var(--mute);
