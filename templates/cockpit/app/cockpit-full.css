@@ -601,99 +601,200 @@
 }
 
 /* ---------- office ---------- */
+/* FA-19080: the mockup's framed console: a glowing OFFICE title, then six neon tiles, each a label,
+   a ringed line icon and a big number in the tile's tone. Two tiles a row until the card is wide
+   enough for three (the home column at 1280 gives it under 300 px). */
 .cf-office {
+  container-type: inline-size;
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 10px;
+  gap: 10px;
+  padding: 12px 10px 14px;
   border-radius: 14px;
-  border: 1px solid var(--edge);
-  background: rgba(4, 11, 22, 0.85);
-  box-shadow: inset 0 0 24px rgba(76, 195, 255, 0.05), 0 0 18px rgba(76, 195, 255, 0.08);
+  border: 1px solid rgba(76, 195, 255, 0.55);
+  background:
+    linear-gradient(#4cc3ff, #4cc3ff) left top / 18px 2px no-repeat,
+    linear-gradient(#4cc3ff, #4cc3ff) left top / 2px 18px no-repeat,
+    linear-gradient(#4cc3ff, #4cc3ff) right top / 18px 2px no-repeat,
+    linear-gradient(#4cc3ff, #4cc3ff) right top / 2px 18px no-repeat,
+    linear-gradient(#4cc3ff, #4cc3ff) left bottom / 18px 2px no-repeat,
+    linear-gradient(#4cc3ff, #4cc3ff) left bottom / 2px 18px no-repeat,
+    linear-gradient(#4cc3ff, #4cc3ff) right bottom / 18px 2px no-repeat,
+    linear-gradient(#4cc3ff, #4cc3ff) right bottom / 2px 18px no-repeat,
+    linear-gradient(rgba(76, 195, 255, 0.04) 1px, transparent 1px) 0 0 / 22px 22px,
+    linear-gradient(90deg, rgba(76, 195, 255, 0.04) 1px, transparent 1px) 0 0 / 22px 22px,
+    linear-gradient(180deg, rgba(6, 18, 34, 0.96), rgba(3, 9, 18, 0.96));
+  box-shadow:
+    0 0 0 1px rgba(76, 195, 255, 0.08),
+    0 0 22px rgba(76, 195, 255, 0.22),
+    inset 0 0 28px rgba(76, 195, 255, 0.1);
   cursor: pointer;
   min-width: 0;
 }
 .cf-ofh {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 10px;
+  justify-content: center;
+  gap: 2px 10px;
+  padding: 2px 6px 9px;
+  position: relative;
+}
+.cf-ofh::after {
+  content: "";
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(76, 195, 255, 0.75), transparent);
+  box-shadow: 0 0 6px rgba(76, 195, 255, 0.6);
 }
 .cf-oft {
-  color: var(--title);
-  font-size: 12px;
-  font-weight: 800;
-  letter-spacing: 0.14em;
+  color: #7fe0ff;
+  font-size: 26px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
+  text-shadow: 0 0 8px rgba(76, 195, 255, 0.9), 0 0 20px rgba(76, 195, 255, 0.5);
 }
 .cf-ofs {
-  color: var(--mute);
-  font-size: 12px;
+  color: #8fdcff;
+  font-size: 15px;
+  font-weight: 500;
+  text-shadow: 0 0 10px rgba(76, 195, 255, 0.55);
+  overflow-wrap: anywhere;
+  text-align: center;
 }
 .cf-oftiles {
   flex: 1;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   grid-auto-rows: 1fr;
   gap: 8px;
 }
+@container (min-width: 440px) {
+  .cf-oftiles {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
 .cf-oftile {
+  --oc: #4cc3ff;
+  --oc-rgb: 76, 195, 255;
+  --on: #5fd4ff;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
   gap: 6px;
-  min-height: 92px;
-  padding: 8px 4px;
+  min-height: 104px;
+  padding: 8px 8px 7px;
   border-radius: 10px;
-  border: 1px solid rgba(76, 195, 255, 0.24);
-  background: linear-gradient(180deg, rgba(10, 30, 52, 0.55), rgba(4, 11, 22, 0.85));
-  box-shadow: inset 0 0 16px rgba(76, 195, 255, 0.06);
+  border: 1px solid rgba(var(--oc-rgb), 0.45);
+  background:
+    radial-gradient(120% 80% at 20% 70%, rgba(var(--oc-rgb), 0.1), transparent 60%),
+    linear-gradient(180deg, rgba(10, 30, 52, 0.6), rgba(4, 11, 22, 0.9));
+  box-shadow: inset 0 0 14px rgba(var(--oc-rgb), 0.1), 0 0 10px rgba(var(--oc-rgb), 0.12);
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .cf-oftile:hover {
-  border-color: var(--edge-hi);
-  box-shadow: 0 0 14px rgba(76, 195, 255, 0.2);
+  border-color: rgba(var(--oc-rgb), 0.8);
+  box-shadow: inset 0 0 16px rgba(var(--oc-rgb), 0.14), 0 0 16px rgba(var(--oc-rgb), 0.3);
 }
-.cf-ofn {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 4px;
-  white-space: nowrap;
+.cf-oftile.t-g {
+  --oc: #34d399;
+  --oc-rgb: 52, 211, 153;
+  --on: #6ee7b7;
+}
+.cf-oftile.t-a {
+  --oc: #fbbf24;
+  --oc-rgb: 251, 191, 36;
+  --on: #fcd34d;
+}
+.cf-oftile.t-r {
+  --oc: #f87171;
+  --oc-rgb: 248, 113, 113;
+  --on: #fca5a5;
+}
+.cf-oftile[data-of="refusals"].t-a {
+  --oc: #fb7155;
+  --oc-rgb: 251, 113, 85;
+  --on: #fdba4d;
+}
+.cf-ofl {
+  color: #8fdcff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+.cf-ofbody {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
 }
 .cf-ofi {
-  font-size: 17px;
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(var(--oc-rgb), 0.75);
+  color: var(--oc);
+  font-size: 18px;
+  background: radial-gradient(circle, rgba(var(--oc-rgb), 0.12), transparent 70%);
+  box-shadow: 0 0 10px rgba(var(--oc-rgb), 0.45), inset 0 0 8px rgba(var(--oc-rgb), 0.3), 0 0 0 4px rgba(var(--oc-rgb), 0.07);
+}
+.cf-ofi svg {
+  width: 24px;
+  height: 24px;
+  filter: drop-shadow(0 0 3px rgba(var(--oc-rgb), 0.8));
+}
+.cf-ofn {
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: flex-end;
+  column-gap: 1px;
+  text-align: right;
 }
 .cf-ofn b {
-  font-size: 22px;
+  font-size: 26px;
   font-weight: 700;
-  color: #9fe3ff;
-  text-shadow: 0 0 10px rgba(76, 195, 255, 0.55);
+  line-height: 1;
+  color: var(--on);
+  text-shadow: 0 0 10px rgba(var(--oc-rgb), 0.65);
+  font-variant-numeric: tabular-nums;
 }
 .cf-ofn small {
-  font-size: 12px;
-  color: var(--tx2);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--on);
+  opacity: 0.85;
+  overflow-wrap: anywhere;
 }
-.cf-oftile.t-g .cf-ofn b {
-  color: #6ee7b7;
-  text-shadow: 0 0 10px rgba(52, 211, 153, 0.55);
-}
-.cf-oftile.t-a .cf-ofn b {
-  color: #fcd34d;
-  text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
-}
-.cf-oftile.t-r .cf-ofn b {
-  color: #fca5a5;
-}
-.cf-oftile.t-d .cf-ofn b {
-  color: #7fa9c6;
-  text-shadow: none;
+.cf-ofbar {
+  align-self: flex-end;
+  width: 62%;
+  height: 2px;
+  background:
+    linear-gradient(90deg, rgba(var(--oc-rgb), 0.9) 0 22%, transparent 22% 30%, rgba(var(--oc-rgb), 0.5) 30% 44%, transparent 44% 52%, rgba(var(--oc-rgb), 0.35) 52% 100%);
+  box-shadow: 0 0 4px rgba(var(--oc-rgb), 0.5);
+  border-radius: 2px;
 }
 .cf-oftile.live {
   animation: cfLive 2.4s ease-in-out infinite;
 }
 @keyframes cfLive {
   50% {
-    box-shadow: 0 0 16px rgba(52, 211, 153, 0.25), inset 0 0 16px rgba(52, 211, 153, 0.08);
+    box-shadow: 0 0 18px rgba(var(--oc-rgb), 0.35), inset 0 0 18px rgba(var(--oc-rgb), 0.14);
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -701,15 +802,10 @@
     animation: none;
   }
 }
-.cf-ofl {
-  color: var(--tx2);
-  font-size: 11.5px;
-  font-weight: 600;
-  text-align: center;
-}
 .cf-ofnote {
   color: var(--mute);
   padding: 12px 4px;
+  text-align: center;
 }
 
 /* ---------- tiles (faces, mode, key numbers) ---------- */
@@ -1367,7 +1463,7 @@
     display: flex;
   }
   .cf-oftile {
-    min-height: 76px;
+    min-height: 96px;
   }
   .cf-page.glance .cf-cap,
   .cf-page.glance .cf-keys,
