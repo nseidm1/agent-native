@@ -49,7 +49,7 @@ export interface StudioPart {
   chip: string;
   platform: string;
   identity: Identity;
-  inbox: { need: number; proposals: number; text: string };
+  inbox: { need: number; proposals: number; text: string; qs?: { id: string; question: string; priority: string }[]; more?: number };
   tiles: LifeTile[];
   staging: StudioStaging;
   thumb: string | null;
