@@ -8,6 +8,8 @@ import "./queue.css";
 import { AccountPart } from "./AccountPart";
 import { MasterPart } from "./MasterPart";
 import { PhonePart } from "./PhonePart";
+import { AppsPart } from "./AppsPart";
+import { QuestionsPart } from "./QuestionsPart";
 
 /** What a window's own part gets: its document, whether this viewer may write, and a refresh. */
 export type WindowPartProps = { d: WindowDetail; canWrite: boolean; onDone: () => void };
@@ -21,4 +23,6 @@ export const WINDOW_PARTS: Partial<Record<WindowId, ComponentType<WindowPartProp
   account: AccountPart,
   master: MasterPart,
   phone: PhonePart,
+  apps: AppsPart,
+  questions: QuestionsPart,
 };

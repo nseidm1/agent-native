@@ -33,6 +33,8 @@ export interface LaneView {
   production: boolean | null;
   /** haloClient: Client on */
   client: boolean | null;
+  /** FA-19134: the Lane card's questions button (legacy qBtn, qTick): shown only while features.questions.n > 0 */
+  questions?: { n: number; label: string; sub: string; tone: "red" | "amber"; aria: string } | null;
 }
 
 export interface BudgetView {

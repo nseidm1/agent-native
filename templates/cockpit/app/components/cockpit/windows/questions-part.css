@@ -1,0 +1,36 @@
+/* FA-19134: the questions window's way to Issues (QuestionsPart.tsx). */
+.qp-iss {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  padding: 8px 10px;
+  border: 1px dashed rgba(76, 195, 255, 0.28);
+  border-radius: 8px;
+  font-size: 12px;
+  color: var(--tx2);
+}
+.qp-ic {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--dim);
+  color: var(--dim);
+  font: 800 12px/1 inherit;
+}
+.qp-ic.on {
+  border-color: var(--amb);
+  color: var(--amb);
+  box-shadow: 0 0 8px rgba(251, 191, 36, 0.45);
+}
+.qp-t {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+.qp-t b {
+  color: var(--tx);
+  margin-right: 4px;
+}

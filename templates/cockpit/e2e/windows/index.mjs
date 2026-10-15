@@ -10,4 +10,8 @@ import jev from "./jev.mjs";
 import push from "./push.mjs";
 import queue from "./queue.mjs";
 
-export const WINDOWS = [push, overview, agents, queue, account, master, phone, jev, halosave, balancer];
+import apps from "./apps.mjs";
+import issues from "./issues.mjs";
+import questions from "./questions.mjs";
+
+export const WINDOWS = [push, overview, agents, queue, account, master, phone, jev, halosave, balancer, apps, questions, issues];
