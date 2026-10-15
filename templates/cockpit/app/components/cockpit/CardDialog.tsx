@@ -17,6 +17,8 @@ import {
   WRITE_ACTIONS,
 } from "@shared/cockpit-detail";
 
+import { useCanWrite } from "./viewer";
+
 /** The cockpit (the parent window) gives the iframe the whole viewport while a dialog is open. */
 export function postModal(open: boolean) {
   try {
@@ -26,12 +28,8 @@ export function postModal(open: boolean) {
   }
 }
 
-/** Writes act on this Mac; a viewer reaching the region over the tailnet sees them disabled (the server refuses them too). */
-export function isLocalViewer(): boolean {
-  if (typeof window === "undefined") return false;
-  const h = window.location.hostname.replace(/^\[|\]$/g, "");
-  return h === "127.0.0.1" || h === "localhost" || h === "::1";
-}
+/** Writes act on this Mac, or from a phone the cockpit's own write gate admits (MI-370); anyone else sees them disabled (the server refuses them too). */
+export { isLocalViewer } from "./viewer";
 
 export const READ_ONLY = "read-only on this device";
 
@@ -422,7 +420,7 @@ export const GLYPH: Record<Tone, string> = { g: "✓", a: "⚠", r: "✕", d: "�
 
 export function CardDialog({ card, onClose, returnTo }: { card: CockpitCard | null; onClose: () => void; returnTo: HTMLElement | null }) {
   const open = !!card;
-  const canWrite = useMemo(isLocalViewer, []);
+  const canWrite = useCanWrite();
   const returnRef = useRef<HTMLElement | null>(null);
   returnRef.current = returnTo;
   useEffect(() => {

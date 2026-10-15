@@ -6,7 +6,8 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 import { type BoardCard, type BoardCardRead, type BoardView, boardCardActions, boardMatch } from "@shared/cockpit-board";
 import { CARD_TITLES, type CockpitCard } from "@shared/cockpit";
 
-import { ActionButton, GLYPH, isLocalViewer, postModal, READ_ONLY, SearchField } from "./CardDialog";
+import { ActionButton, GLYPH, postModal, READ_ONLY, SearchField } from "./CardDialog";
+import { useCanWrite } from "./viewer";
 
 /**
  * The whole board, rendered here from the cockpit client (FA-19027): every
@@ -229,7 +230,7 @@ function CardView({ fa, board, canWrite, onBack, onOpen, onDone }: {
 
 export function BoardDialog({ card, onClose, returnTo }: { card: CockpitCard | null; onClose: () => void; returnTo: HTMLElement | null }) {
   const open = !!card;
-  const canWrite = useMemo(isLocalViewer, []);
+  const canWrite = useCanWrite();
   const qc = useQueryClient();
   const returnRef = useRef<HTMLElement | null>(null);
   returnRef.current = returnTo;

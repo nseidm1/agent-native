@@ -5,7 +5,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { CARD_TITLES, type CardId, type CardsResult, type CockpitCard } from "@shared/cockpit";
 import type { HomeView, Opens } from "@shared/cockpit-home";
 import { BoardDialog } from "./BoardDialog";
-import { CardDialog, isLocalViewer } from "./CardDialog";
+import { CardDialog } from "./CardDialog";
+import { useCanWrite } from "./viewer";
 import { CardRegion } from "./CardRegion";
 import { Home } from "./Home";
 import { LegacyWindow, type LegacyTarget } from "./LegacyWindow";
@@ -34,7 +35,7 @@ export function Cockpit() {
   const qc = useQueryClient();
   const homeQ = useActionQuery<HomeView>("get-home", {}, { refetchInterval: 10000 });
   const cardsQ = useActionQuery<CardsResult>("get-cards", {}, { refetchInterval: 15000 });
-  const canWrite = useMemo(isLocalViewer, []);
+  const canWrite = useCanWrite();
   const [notices, setNotices] = useState<{ id: number; text: string; bad?: boolean }[]>([]);
   const nid = useRef(0);
   const notify = useCallback((text: string, bad?: boolean) => {
