@@ -23,6 +23,9 @@ export const COCKPIT_ACTIONS = {
   "funnel-on": "appkpis.funnelOn",
   "board-card": "board.cardAction",
   "halo-model": "halo.setModel",
+  // FA-19087: the home column's controls
+  "lane-switch": "locks.set",
+  budget: "budget.set",
 } as const;
 /** Every manifest action name a dialog can run. */
 export const COCKPIT_ACTION_NAMES_USED = [
@@ -36,6 +39,8 @@ export const COCKPIT_ACTION_NAMES_USED = [
   "appkpis.funnelOn",
   "board.cardAction",
   "halo.setModel",
+  "locks.set",
+  "budget.set",
 ] as const;
 
 /**
@@ -50,6 +55,8 @@ export const WRITE_ACTIONS = {
   "funnel-on": "cockpit-funnel-on",
   "board-card": "cockpit-board-card-action",
   "halo-model": "cockpit-halo-model",
+  "lane-switch": "cockpit-lane-switch",
+  budget: "cockpit-budget",
 } as const;
 export type WriteKind = keyof typeof WRITE_ACTIONS;
 export const WRITE_ACTION_NAMES = Object.values(WRITE_ACTIONS);

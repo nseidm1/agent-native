@@ -86,6 +86,10 @@
    "description": "The office: who is at which desk, the queue, the Halo row and today's landed and failed counts."
   },
   {
+   "name": "home",
+   "description": "The home column: the three faces (overview, door to landing, speed), the save forecast, the key-number inputs (commits today, throughput, velocity bar, landed rate, worktree and features key cards, saved vs off, reset retention) and the office's facts and shape."
+  },
+  {
    "name": "board/cards",
    "description": "Every open card on the board (archived excluded): id, FA, title, column, priority, estimate, parent, children, links, paused, triaged, chips, app and lane stage."
   },
@@ -104,6 +108,30 @@
   {
    "name": "estimate",
    "description": "The estimate panel: the spend baseline, savings by lever and the ratios the scorecard window shows."
+  },
+  {
+   "name": "budget",
+   "description": "The Budget: the % of the weekly account limit the fleet may use per day (pctPerDay) or Auto, the value in force, its pace line, flags and notes (budget.set changes it)."
+  },
+  {
+   "name": "release",
+   "description": "Push to remote: how many commits local master is ahead of its upstream, the newest subjects, why a push cannot go, and the last push (read only; the push itself is the console's act)."
+  },
+  {
+   "name": "jevsavings",
+   "description": "JEV + JevGrep savings: today and the week, the per-day series (live and replay), the workload table and the levers."
+  },
+  {
+   "name": "account",
+   "description": "The Claude account the lane runs on: its label and tone, the Halo login match, the plan usage windows."
+  },
+  {
+   "name": "master",
+   "description": "Messages with master: the console's messages and master's replies (newest last), for the header's unread count."
+  },
+  {
+   "name": "android",
+   "description": "The phone app: whether a phone is attached, its install state and what the header pill says."
   }
  ],
  "actions": [
@@ -338,6 +366,44 @@
       "maxLength": 80
      },
      "enabled": {
+      "type": "boolean"
+     }
+    }
+   }
+  },
+  {
+   "name": "locks.set",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [],
+    "properties": {
+     "masterIntervene": {
+      "type": "boolean"
+     },
+     "dispatcher": {
+      "type": "boolean"
+     },
+     "haloClient": {
+      "type": "boolean"
+     }
+    }
+   }
+  },
+  {
+   "name": "budget.set",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [],
+    "properties": {
+     "pctPerDay": {
+      "type": "number",
+      "maximum": 100
+     },
+     "auto": {
       "type": "boolean"
      }
     }

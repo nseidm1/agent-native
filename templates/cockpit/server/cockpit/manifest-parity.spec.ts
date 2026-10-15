@@ -15,13 +15,14 @@ import { describe, expect, it } from "vitest";
 
 import { COCKPIT_ACTION_NAMES_USED } from "../../shared/cockpit-detail";
 import { manifest } from "./client";
+import { HOME_RESOURCES } from "./home";
 import { STATE_RESOURCES } from "./state";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const snap = JSON.parse(readFileSync(path.join(HERE, "..", "..", "shared", "cockpit-manifest.json"), "utf8"));
 
 /** Every resource name this app reads (board/card/{fa} is the template board.ts fills). */
-export const RESOURCES_USED = [...STATE_RESOURCES, "halomodels", "appdata", "estimate", "board/card/{fa}"];
+export const RESOURCES_USED = [...new Set([...STATE_RESOURCES, ...HOME_RESOURCES, "halomodels", "appdata", "estimate", "board/card/{fa}"])];
 /** Every action name this app runs: the dialog writes, the request images and the ping. */
 export const ACTIONS_USED = [...COCKPIT_ACTION_NAMES_USED, "board.attach", "ping"];
 
