@@ -10,8 +10,10 @@ import {
   type DetailCell,
   type DetailFilter,
   type DetailRow,
+  type DetailSearch,
   type DetailSection,
   type JobForm,
+  searchSections,
   WRITE_ACTIONS,
 } from "@shared/cockpit-detail";
 
@@ -325,10 +327,48 @@ function JobStart({ form, canWrite, onDone }: { form: JobForm; canWrite: boolean
   );
 }
 
+/** The dialog's search field (the Board dialog: cards and sub-cards by FA id or title). */
+function SearchField({ search, value, onChange, matches }: { search: DetailSearch; value: string; onChange: (v: string) => void; matches: number }) {
+  return (
+    <div className="cp-search" role="search">
+      <svg className="cp-search-i" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+        <circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" strokeWidth="2" />
+        <path d="m15.5 15.5 5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+      </svg>
+      <input
+        type="search"
+        className="cp-in cp-search-in"
+        aria-label={search.label}
+        placeholder={search.placeholder}
+        value={value}
+        maxLength={120}
+        autoComplete="off"
+        spellCheck={false}
+        data-testid="detail-search"
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(e) => {
+          // Escape clears the field first; a second Escape closes the dialog
+          if (e.key === "Escape" && value) {
+            e.preventDefault();
+            e.stopPropagation();
+            onChange("");
+          }
+        }}
+      />
+      {value.trim() ? (
+        <span className={"cp-search-n" + (matches ? "" : " none")} aria-live="polite" data-testid="detail-search-count">
+          {matches ? matches + (matches === 1 ? " card" : " cards") : "no match"}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
 function DetailBody({ id, canWrite }: { id: CardId; canWrite: boolean }) {
   const qc = useQueryClient();
   const [server, setServer] = useState<Record<string, string>>({});
   const [local, setLocal] = useState<Record<string, string>>({});
+  const [query, setQuery] = useState("");
   const q = useActionQuery<CardDetail>("get-card-detail", { id, ...server } as any, { refetchInterval: 5000 });
   const d = q.data;
   const refresh = () => {
@@ -338,6 +378,7 @@ function DetailBody({ id, canWrite }: { id: CardId; canWrite: boolean }) {
     const f = d?.filters?.find((x) => !x.server);
     return f ? local[f.key] ?? f.value : "all";
   }, [d, local]);
+  const found = useMemo(() => (d && d.search ? searchSections(d.sections, query) : { sections: d?.sections ?? [], matches: -1 }), [d, query]);
   if (!d) {
     return <div className="cp-dlg-msg">{q.isError ? "Could not read this card: " + (q.error instanceof Error ? q.error.message : String(q.error)) : "Reading the cockpit…"}</div>;
   }
@@ -349,6 +390,7 @@ function DetailBody({ id, canWrite }: { id: CardId; canWrite: boolean }) {
         </div>
       ) : null}
       {d.lead ? <p className="cp-lead">{d.lead}</p> : null}
+      {d.search ? <SearchField search={d.search} value={query} onChange={setQuery} matches={found.matches} /> : null}
       {d.filters && d.filters.length ? (
         <Filters
           filters={d.filters}
@@ -363,8 +405,9 @@ function DetailBody({ id, canWrite }: { id: CardId; canWrite: boolean }) {
       ) : null}
       <Actions actions={d.actions} canWrite={canWrite} onDone={refresh} />
       {d.jobForm ? <JobStart form={d.jobForm} canWrite={canWrite} onDone={refresh} /> : null}
-      {d.sections.map((s, i) => (
-        <Section key={s.title + i} s={s} tagFilter={tagFilter} canWrite={canWrite} onDone={refresh} />
+      {found.matches === 0 ? <p className="cp-empty">No card matches "{query.trim()}".</p> : null}
+      {found.sections.map((s, i) => (
+        <Section key={s.title + i + (found.matches >= 0 ? ":q" : "")} s={s} tagFilter={tagFilter} canWrite={canWrite} onDone={refresh} />
       ))}
       <p className="cp-at">
         {d.ok ? "Live · read " : "Last read "}

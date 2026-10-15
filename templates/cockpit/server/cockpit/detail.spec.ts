@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 import { CARD_IDS } from "../../shared/cockpit";
-import { type CardDetail, DETAIL_MAX_CHARS, DETAIL_MAX_ROWS } from "../../shared/cockpit-detail";
+import { type CardDetail, DETAIL_MAX_CHARS, DETAIL_MAX_ROWS, searchSections } from "../../shared/cockpit-detail";
 import { buildDetail } from "./detail";
 
 /** Every string in a detail, for the bound checks. */
@@ -71,6 +71,44 @@ describe("card detail", () => {
     expect(acts("paused")).toEqual(["resume", "archive"]);
     expect(acts("no actions")).toBeUndefined();
     for (const s of d.sections) for (const r of s.rows || []) for (const a of r.actions || []) expect(a.kind).toBe("board-card");
+  });
+
+  it("the board dialog's search narrows cards and sub-cards by FA id or title", () => {
+    const board = {
+      columns: [
+        { id: "todo", name: "To do" },
+        { id: "in-progress", name: "In progress" },
+        { id: "released", name: "Released" },
+      ],
+      cards: [
+        { fa: "FA-18951", title: "Agent-controlled cockpit", col: "in-progress" },
+        { id: "kid", fa: "FA-18957", title: "set-layout action", col: "todo", parent: "FA-18951" },
+        { fa: "FA-100", title: "Search the board", col: "todo" },
+        { fa: "FA-200", title: "an old one", col: "released" },
+      ],
+    };
+    const d = buildDetail("board", { board });
+    expect(d.search).toEqual({ label: "Search cards", placeholder: expect.stringContaining("FA-") });
+    const faOf = (r: { sections: { rows?: { cells: unknown[] }[] }[] }) =>
+      r.sections.flatMap((s) => s.rows || []).map((x) => {
+        const c = x.cells[0] as string | { t: string };
+        return typeof c === "string" ? c : c.t;
+      });
+    // an empty query leaves every section as it was
+    expect(searchSections(d.sections, "  ").sections).toBe(d.sections);
+    // by id, in any spelling, sub-cards included
+    expect(faOf(searchSections(d.sections, "FA-18951"))).toEqual(["FA-18951"]);
+    expect(faOf(searchSections(d.sections, "fa 18957"))).toEqual(["FA-18957"]);
+    expect(faOf(searchSections(d.sections, "1895")).sort()).toEqual(["FA-18951", "FA-18957"]);
+    // by title, case-insensitive
+    expect(faOf(searchSections(d.sections, "SEARCH"))).toEqual(["FA-100"]);
+    // a match inside a collapsed group opens it, and a group with no match is dropped
+    const old = searchSections(d.sections, "FA-200");
+    expect(old.matches).toBe(1);
+    expect(old.sections.map((s) => [s.title, s.collapsed, s.sub])).toEqual([["Released", false, "1 of 1 match"]]);
+    expect(searchSections(d.sections, "FA-999")).toEqual({ sections: [], matches: 0 });
+    // only the board offers a search
+    expect(buildDetail("events", {}).search).toBeUndefined();
   });
 
   it("modes takes its work class and window from the arguments", () => {

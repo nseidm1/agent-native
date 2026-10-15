@@ -19,6 +19,7 @@ import {
   type DetailFilter,
   type DetailItem,
   type DetailRow,
+  type DetailSearch,
   type DetailSection,
   type DetailStat,
   type JobForm,
@@ -44,6 +45,7 @@ interface Body {
   lead?: string;
   sections: DetailSection[];
   filters?: DetailFilter[];
+  search?: DetailSearch;
   actions?: DetailAction[];
   jobForm?: JobForm;
 }
@@ -667,6 +669,7 @@ function board(j: J): Body {
         cells: [cell(fa, undefined, true), cell(x.title), cell(chips.join(" · "), PR_TONE[x.pr])],
         tone: x.paused || x.blocked ? "a" : PR_TONE[x.pr],
         actions: acts.length ? acts : undefined,
+        find: fa + " " + str(x.title),
       };
     });
     const n = counts[c.id] ?? inCol.length;
@@ -678,7 +681,11 @@ function board(j: J): Body {
       }),
     );
   }
-  return { lead: "Updated " + (B.at ? ago(B.at, Date.now()) : "n/a") + ". Pause, resume, promote, backlog and archive go to the board itself.", sections };
+  return {
+    lead: "Updated " + (B.at ? ago(B.at, Date.now()) : "n/a") + ". Pause, resume, promote, backlog and archive go to the board itself.",
+    search: { label: "Search cards", placeholder: "Card id or title, e.g. FA-18951" },
+    sections,
+  };
 }
 
 // ---------- models ----------

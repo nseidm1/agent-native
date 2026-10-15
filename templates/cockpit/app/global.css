@@ -1390,3 +1390,78 @@ select.cp-in {
     justify-content: center;
   }
 }
+
+/* FA-18951: the Board dialog's search - cards and sub-cards by FA id or title */
+.cp-search {
+  position: sticky;
+  top: -8px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 8px;
+  border: 1px solid rgba(76, 195, 255, 0.4);
+  border-radius: 8px;
+  background: var(--inner);
+  box-shadow: 0 0 0 1px rgba(76, 195, 255, 0.08), 0 0 14px -6px var(--glow);
+}
+.cp-search:focus-within {
+  border-color: var(--sky);
+  box-shadow: 0 0 0 1px var(--sky), 0 0 18px -4px var(--glow);
+}
+.cp-search-i {
+  flex: none;
+  color: var(--sky);
+  filter: drop-shadow(0 0 4px var(--glow));
+}
+.cp-dlg .cp-search-in,
+.cp-search-in {
+  flex: 1 1 auto;
+  width: 0;
+  min-width: 0;
+  height: 28px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  font-size: 13px;
+  outline: none;
+}
+.cp-dlg .cp-search-in:focus-visible {
+  outline: none;
+}
+.cp-search-in::-webkit-search-cancel-button {
+  filter: hue-rotate(180deg) brightness(1.4);
+  cursor: pointer;
+}
+.cp-search-n {
+  flex: none;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: var(--em);
+  white-space: nowrap;
+}
+.cp-search-n.none {
+  color: var(--amb);
+}
+
+/* FA-18951: which path an Ask agent request took */
+.cp-ask-path {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 4px;
+  border: 1px solid rgba(76, 195, 255, 0.4);
+  color: var(--sky);
+  font-weight: 700;
+  font-size: 10.5px;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+.cp-ask-path.k-change {
+  border-color: rgba(192, 132, 252, 0.55);
+  color: var(--vio);
+}
+.cp-ask-out.filed {
+  border-left-color: var(--vio);
+}

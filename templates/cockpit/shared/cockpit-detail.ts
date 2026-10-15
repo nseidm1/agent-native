@@ -46,6 +46,8 @@ export interface DetailRow {
   /** A second, quieter line under the row. */
   note?: string;
   actions?: DetailAction[];
+  /** The text the dialog's search matches (a board card's FA id and title); a row without it never matches a search. */
+  find?: string;
 }
 
 export interface DetailStat {
@@ -110,5 +112,41 @@ export interface CardDetail {
   /** Whole-dialog writes (release now, auto-release, funnel on). */
   actions?: DetailAction[];
   jobForm?: JobForm;
+  /** A search field at the top of the dialog, filtering table rows by their find text. */
+  search?: DetailSearch;
   sections: DetailSection[];
+}
+
+export interface DetailSearch {
+  label: string;
+  placeholder: string;
+}
+
+/** Lower case with spaces, dashes and underscores dropped, so "FA 18951", "fa-18951" and "18951" all find FA-18951. */
+export const searchKey = (s: string) => s.toLowerCase().replace(/[\s_-]+/g, "");
+
+/** True when the row's find text holds the query (empty query: every row). */
+export function rowMatches(row: DetailRow, query: string): boolean {
+  const q = searchKey(query);
+  if (!q) return true;
+  return !!row.find && searchKey(row.find).includes(q);
+}
+
+/**
+ * The sections a search leaves: table rows that match, a section with no match
+ * dropped, and a collapsed section opened (a match hidden in a closed Released
+ * group would read as no match). An empty query returns the sections unchanged.
+ */
+export function searchSections(sections: DetailSection[], query: string): { sections: DetailSection[]; matches: number } {
+  if (!searchKey(query)) return { sections, matches: -1 };
+  let matches = 0;
+  const out: DetailSection[] = [];
+  for (const s of sections) {
+    if (s.kind !== "table") continue;
+    const rows = (s.rows || []).filter((r) => rowMatches(r, query));
+    if (!rows.length) continue;
+    matches += rows.length;
+    out.push({ ...s, rows, collapsed: false, more: undefined, sub: rows.length + " of " + (s.rows || []).length + " match" });
+  }
+  return { sections: out, matches };
 }
