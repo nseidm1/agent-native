@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import type { HeaderView } from "@shared/cockpit-home";
 
-/** What a header button opens: a dialog the legacy page still owns, by its button id there (LegacyWindow clicks it). */
+/** What a header button opens: its native window, by the button's legacy id (HEADER_WINDOWS), or a link. */
 export type HeaderOpen = { button: string; label: string } | { href: string };
 
 const seenKey = "msgSeen";
@@ -18,9 +18,9 @@ function readSeen(): number {
  * The cockpit's top bar (FA-19087): the Family Office mark, the phone and status
  * pills, the account chip with the Halo match, Architecture, Apps, the plan
  * usage, Message master with its unread count, Push to remote with its count,
- * and the update time. Ported from the legacy header (index.html #top); the
- * dialogs it opens are still the legacy page's (LegacyWindow) until each is
- * ported (FA-19087 children).
+ * and the update time. Ported from the legacy header (index.html #top); every
+ * dialog it opens is a native window (FA-19087 children; FA-19136 retired the
+ * legacy page's window bridge).
  */
 export function TopBar({ h, onOpen, glance, onGlance }: { h: HeaderView; onOpen: (o: HeaderOpen) => void; glance: boolean; onGlance: () => void }) {
   const [menu, setMenu] = useState(false);

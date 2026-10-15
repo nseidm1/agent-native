@@ -13,17 +13,8 @@ import { useCanWrite } from "./viewer";
 import { WindowDialog } from "./WindowDialog";
 import { CardRegion } from "./CardRegion";
 import { Home } from "./Home";
-import { LegacyWindow, type LegacyTarget } from "./LegacyWindow";
 import { TopBar, type HeaderOpen } from "./TopBar";
 
-const LEGACY_LABEL: Record<string, string> = {
-  overview: "Overview",
-  agents: "Who's working",
-  jev: "JEV + JevGrep savings",
-  halosave: "Halo savings",
-  balancer: "Balancer",
-  queue: "Commit queue",
-};
 const GLANCE_KEY = "lcc-glance";
 
 /**
@@ -48,7 +39,6 @@ export function Cockpit() {
     setTimeout(() => setNotices((n) => n.filter((x) => x.id !== id)), bad ? 9000 : 5000);
   }, []);
   const [cardOpen, setCardOpen] = useState<CardId | null>(null);
-  const [legacy, setLegacy] = useState<LegacyTarget | null>(null);
   const [win, setWin] = useState<WindowId | null>(null);
   const [winArgs, setWinArgs] = useState<Record<string, string>>({});
   const opener = useRef<HTMLElement | null>(null);
@@ -86,7 +76,6 @@ export function Cockpit() {
       setWinArgs({});
       setWin(o.legacy);
     }
-    else setLegacy({ slug: o.legacy, label: LEGACY_LABEL[o.legacy] || o.legacy });
   }, []);
   const openHeader = useCallback((o: HeaderOpen) => {
     if ("href" in o) window.open(o.href, "_blank", "noopener");
@@ -94,7 +83,7 @@ export function Cockpit() {
       opener.current = document.activeElement as HTMLElement | null;
       setWinArgs({});
       setWin(HEADER_WINDOWS[o.button]);
-    } else setLegacy({ button: o.button, label: o.label });
+    }
   }, []);
   const refresh = useCallback(() => void qc.invalidateQueries(), [qc]);
   // FA-19129/FA-19134: the windows' own openers - #questions (#questions/<id>), #issues and #apps open the native windows;
@@ -104,7 +93,6 @@ export function Cockpit() {
       const h = window.location.hash;
       const app = /^#apps=([\w-]+)$/.exec(h);
       if (app) {
-        setLegacy(null);
         setWinArgs({ app: app[1] });
         setWin("apps");
         return;
@@ -113,13 +101,6 @@ export function Cockpit() {
       if (m && isNativeWindow(m[1])) {
         setWinArgs({});
         setWin(m[1]);
-      }
-    };
-    const onLegacy = (e: Event) => {
-      const d = (e as CustomEvent<{ slug?: string; label?: string }>).detail;
-      if (d && typeof d.slug === "string") {
-        setWin(null);
-        setLegacy({ slug: d.slug, label: String(d.label || d.slug) });
       }
     };
     const onWin = (e: Event) => {
@@ -131,11 +112,9 @@ export function Cockpit() {
     };
     fromHash();
     window.addEventListener("hashchange", fromHash);
-    window.addEventListener("cockpit-open-legacy", onLegacy);
     window.addEventListener("cockpit-open-window", onWin);
     return () => {
       window.removeEventListener("hashchange", fromHash);
-      window.removeEventListener("cockpit-open-legacy", onLegacy);
       window.removeEventListener("cockpit-open-window", onWin);
     };
   }, []);
@@ -191,15 +170,6 @@ export function Cockpit() {
           refresh();
         }}
         returnTo={opener.current}
-      />
-      <LegacyWindow
-        target={legacy}
-        onClose={() => {
-          setLegacy(null);
-          clearHash();
-          refresh();
-          opener.current?.focus();
-        }}
       />
     </div>
   );

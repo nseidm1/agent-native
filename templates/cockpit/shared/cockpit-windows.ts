@@ -1,6 +1,6 @@
 /**
- * FA-19087: the cockpit's own windows, rendered by agent-native from the cockpit client (each replaces a legacy
- * window the first pass bridged through LegacyWindow). A window is a detail document, the same shape a card's
+ * FA-19087: the cockpit's own windows, rendered by agent-native from the cockpit client (each replaced a legacy
+ * window the first pass bridged to the legacy page; FA-19136 retired that bridge). A window is a detail document, the same shape a card's
  * click window is (shared/cockpit-detail.ts CardDetail: stats, tables, lists, text and bars, with filters and
  * whole-window writes), built server-side by server/cockpit/windows/<id>.ts and read with get-window.
  */
@@ -39,9 +39,9 @@ export type WindowArgs = Record<string, string | undefined>;
 export const isWindowId = (s: unknown): s is WindowId => typeof s === "string" && (WINDOW_IDS as readonly string[]).includes(s);
 
 /**
- * The windows agent-native renders itself today; every other one still opens the legacy page's window
- * (LegacyWindow) until its section lands. server/cockpit/windows/registry.spec.ts keeps this equal to the
- * registry's builders, so a window is native exactly when it has one.
+ * The windows agent-native renders itself: every one (FA-19136 retired the legacy page's window bridge, so a window
+ * that is not native opens nothing). server/cockpit/windows/registry.spec.ts keeps this equal to the registry's
+ * builders, so a window is native exactly when it has one.
  */
 export const NATIVE_WINDOWS: readonly WindowId[] = ["push", "overview", "agents", "queue", "account", "master", "phone", "jev", "halosave", "balancer", "apps", "questions", "issues"];
 export const isNativeWindow = (s: unknown): s is WindowId => isWindowId(s) && NATIVE_WINDOWS.includes(s);

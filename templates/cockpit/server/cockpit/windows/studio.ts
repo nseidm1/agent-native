@@ -1,6 +1,6 @@
 /**
  * FA-19157: an app's studio, rendered by agent-native from the cockpit client (it used to open the legacy page's studio at
- * #apps=<id> in a LegacyWindow). This file is the pure half: the legacy studio's face as data, ported from
+ * #apps=<id> in a frame of the legacy page). This file is the pure half: the legacy studio's face as data, ported from
  * tools/lane/maint/ui/studio-lifecycle.js (identity, tileData, needTile, deployStages, inboxCount) and studio-pilot.js
  * (tileChip, the Apps tile's autopilot / definition-of-done chip). The reads are the client's apps/<app>/env (start=0: a read
  * never starts staging), apps/<app>/lifecycle, apps/<app>/checklist and apps/<app>/studio, plus appdialog (the staging
