@@ -22,7 +22,7 @@ function readSeen(): number {
  * dialog it opens is a native window (FA-19087 children; FA-19136 retired the
  * legacy page's window bridge).
  */
-export function TopBar({ h, onOpen, glance, onGlance }: { h: HeaderView; onOpen: (o: HeaderOpen) => void; glance: boolean; onGlance: () => void }) {
+export function TopBar({ h, onOpen }: { h: HeaderView; onOpen: (o: HeaderOpen) => void }) {
   const [menu, setMenu] = useState(false);
   const [seen, setSeen] = useState(0);
   useEffect(() => setSeen(readSeen()), [h.master]);
@@ -61,9 +61,6 @@ export function TopBar({ h, onOpen, glance, onGlance }: { h: HeaderView; onOpen:
           <span className={"cf-sdot t-" + h.status.tone} />
           <span>{h.status.text}</span>
         </div>
-        <button type="button" className="cf-btn cf-glance" aria-pressed={glance} onClick={onGlance} title="Glance: mode, who is working and the key numbers on one screen">
-          {glance ? "Full view" : "Glance"}
-        </button>
         <button type="button" className="cf-btn cf-menu" aria-expanded={menu} aria-label="More" onClick={() => setMenu((v) => !v)}>
           ☰
         </button>

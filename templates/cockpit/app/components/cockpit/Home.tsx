@@ -343,15 +343,20 @@ function Tile({ t, onOpen }: { t: KeyTile; onOpen: OpenFn }) {
   );
 }
 
+/** The phone glance's key numbers: velocity first, then what it is made of and the health it rides on. */
+const GLANCE_TILES: KeyTile["id"][] = ["kVel", "kLanded", "kMin", "kWt", "kRg"];
+
 /** The home column: lane and Budget beside the office, the three faces, the drafting mode and the key numbers. */
-export function Home({ home, canWrite, notify, onOpen, onDone }: { home: HomeView; canWrite: boolean; notify: Notify; onOpen: OpenFn; onDone: () => void }) {
+export function Home({ home, glance, canWrite, notify, onOpen, onDone }: { home: HomeView; glance?: boolean; canWrite: boolean; notify: Notify; onOpen: OpenFn; onDone: () => void }) {
+  // the glance (the phone) drops Budget, the drafting mode and the cost tiles and keeps velocity and health, velocity first
+  const tiles = glance ? GLANCE_TILES.flatMap((id) => home.tiles.filter((t) => t.id === id)) : home.tiles;
   return (
-    <div className="cf-home" role="region" aria-label="Lane controls and key numbers" data-testid="cf-home">
+    <div className={"cf-home" + (glance ? " glance" : "")} role="region" aria-label={glance ? "Lane, velocity and system health" : "Lane controls and key numbers"} data-testid="cf-home">
       <div className="cf-lanerow">
         <div className="cf-lanecol">
           <LaneControl lane={home.lane} canWrite={canWrite} notify={notify} onDone={onDone} />
           <QuestionsButton q={home.lane.questions} onOpen={(el) => onOpen({ legacy: "questions" }, el)} />
-          <BudgetBox budget={home.budget} canWrite={canWrite} notify={notify} onDone={onDone} />
+          {glance ? null : <BudgetBox budget={home.budget} canWrite={canWrite} notify={notify} onDone={onDone} />}
         </div>
         <OfficeCard office={home.office} onOpen={(slug, el) => onOpen({ legacy: slug }, el)} onBoard={(el) => onOpen({ card: "board" }, el)} />
       </div>
@@ -360,9 +365,9 @@ export function Home({ home, canWrite, notify, onOpen, onDone }: { home: HomeVie
           <Face key={f.id} f={f} onOpen={onOpen} />
         ))}
       </div>
-      <div className="cf-keys">
-        {home.mode ? <ModeTile m={home.mode} onOpen={onOpen} /> : null}
-        {home.tiles.map((t) => (
+      <div className="cf-keys" role="group" aria-label={glance ? "Velocity and system health" : "Key numbers"}>
+        {home.mode && !glance ? <ModeTile m={home.mode} onOpen={onOpen} /> : null}
+        {tiles.map((t) => (
           <Tile key={t.id} t={t} onOpen={onOpen} />
         ))}
       </div>

@@ -719,6 +719,11 @@ body.cockpit-body {
   .cp-band-h {
     min-height: 32px;
   }
+  /* the cockpit's phone glance: the longer heading may push the live time and Ask agent to a second row */
+  .cp-region.focus .cp-head {
+    flex-wrap: wrap;
+    row-gap: 4px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

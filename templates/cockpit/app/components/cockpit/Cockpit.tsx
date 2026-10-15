@@ -15,7 +15,9 @@ import { CardRegion } from "./CardRegion";
 import { Home } from "./Home";
 import { TopBar, type HeaderOpen } from "./TopBar";
 
-const GLANCE_KEY = "lcc-glance";
+const PHONE_QUERY = "(max-width:767px)";
+/** The glance's cards: the ones that express velocity and the system health it rides on. */
+const GLANCE_CARDS: readonly CardId[] = ["score", "pipeline", "production", "jobs", "forge", "orphans", "models", "halo"];
 
 /**
  * THE WHOLE FRONT-FACING COCKPIT, rendered by agent-native (FA-19087; console
@@ -23,8 +25,10 @@ const GLANCE_KEY = "lcc-glance";
  * tooling"). The top bar and the home column come from get-home, the card
  * region beside them is the same CardRegion the legacy page framed, and every
  * read is the cockpit client's (server/cockpit/client.ts). Desktop: the home
- * column left, the cards right. Phone: one column, the home first; Glance
- * keeps the lane, the office and the faces.
+ * column left, the cards right. Phone: always the glance (console 2026-10-15:
+ * "On mobile we only need glance view, no full view") - one column with the
+ * lane, the office, the faces, the velocity and health numbers and the
+ * velocity and health cards.
  */
 export function Cockpit() {
   const qc = useQueryClient();
@@ -44,23 +48,12 @@ export function Cockpit() {
   const opener = useRef<HTMLElement | null>(null);
   const [glance, setGlance] = useState(false);
   useEffect(() => {
-    let g = "0";
-    try {
-      g = window.localStorage.getItem(GLANCE_KEY) || "0";
-    } catch {
-      // per-viewer convenience only
-    }
-    setGlance(window.location.hash === "#glance" || (g === "1" && window.matchMedia("(max-width:640px)").matches));
+    const mq = window.matchMedia(PHONE_QUERY);
+    const f = () => setGlance(mq.matches);
+    f();
+    mq.addEventListener("change", f);
+    return () => mq.removeEventListener("change", f);
   }, []);
-  const toggleGlance = () =>
-    setGlance((v) => {
-      try {
-        window.localStorage.setItem(GLANCE_KEY, v ? "0" : "1");
-      } catch {
-        // per-viewer convenience only
-      }
-      return !v;
-    });
 
   const byId = useMemo(() => {
     const m = new Map<CardId, CockpitCard>();
@@ -126,7 +119,7 @@ export function Cockpit() {
   return (
     <div className={"cf-page" + (glance ? " glance" : "")} data-testid="cockpit-full">
       {h ? (
-        <TopBar h={h.header} onOpen={openHeader} glance={glance} onGlance={toggleGlance} />
+        <TopBar h={h.header} onOpen={openHeader} />
       ) : (
         <header className="cf-top" data-testid="cf-top">
           <span className="cf-wmt">
@@ -143,12 +136,12 @@ export function Cockpit() {
       ) : null}
       <main className="cf-layout" id="main" tabIndex={-1}>
         <h1 className="sr-only">Family Office lane cockpit</h1>
-        {h ? <Home home={h} canWrite={canWrite} notify={notify} onOpen={open} onDone={refresh} /> : <div className="cf-home cf-loading">Reading the cockpit…</div>}
+        {h ? <Home home={h} glance={glance} canWrite={canWrite} notify={notify} onOpen={open} onDone={refresh} /> : <div className="cf-home cf-loading">Reading the cockpit…</div>}
         <nav className="cf-launch" aria-label="Sections">
-          <CardRegion />
+          <CardRegion focus={glance ? GLANCE_CARDS : undefined} />
         </nav>
       </main>
-      {h ? <div className="cf-foot">{h.foot}</div> : null}
+      {h && !glance ? <div className="cf-foot">{h.foot}</div> : null}
       <UpdateBar />
       <AlertToasts onForge={() => setCardOpen("forge")} />
       <div className="cf-toasts" aria-live="polite">

@@ -194,7 +194,6 @@
   outline: 2px solid var(--sky);
   outline-offset: 2px;
 }
-.cf-glance,
 .cf-menu {
   display: none;
 }
@@ -1320,7 +1319,6 @@
   .cf-pills .cf-brand {
     display: none;
   }
-  .cf-glance,
   .cf-menu {
     display: inline-flex;
     height: 40px;
@@ -1428,10 +1426,26 @@
   .cf-oftile {
     min-height: 96px;
   }
-  .cf-page.glance .cf-cap,
-  .cf-page.glance .cf-keys,
-  .cf-page.glance .cf-foot {
-    display: none;
+  /* the phone is always the glance: compact lane switches, velocity full width, then its make-up and health two up */
+  .cf-home.glance .cf-lock,
+  .cf-home.glance .cf-dsw {
+    min-height: 96px;
+    gap: 6px;
+  }
+  .cf-home.glance .cf-keys {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .cf-home.glance .cf-kt[data-tile="kVel"] {
+    grid-column: 1 / -1;
+  }
+  .cf-home.glance .cf-kt:not([data-tile="kVel"]) {
+    padding: 8px 6px 9px;
+  }
+  .cf-home.glance .cf-kt:not([data-tile="kVel"]) .cf-val {
+    font-size: 15px;
+  }
+  .cf-home.glance .cf-kt:not([data-tile="kVel"]) .cf-lab {
+    letter-spacing: 0.06em;
   }
 }
 

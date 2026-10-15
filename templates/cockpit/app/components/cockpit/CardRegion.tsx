@@ -367,7 +367,8 @@ function CockpitSync() {
   return null;
 }
 
-export function CardRegion() {
+/** focus: show only these cards (the cockpit's phone glance), in the layout's bands and order. */
+export function CardRegion({ focus }: { focus?: readonly CardId[] } = {}) {
   const cardsQ = useActionQuery<CardsResult>("get-cards", {}, { refetchInterval: 15000 });
   const layoutQ = useActionQuery<CockpitLayout>("get-layout", {}, { refetchInterval: 30000 });
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
@@ -423,6 +424,7 @@ export function CardRegion() {
     return m;
   }, [result]);
   const hidden = new Set(layout.hidden);
+  const shown = (id: CardId) => !hidden.has(id) && (!focus || focus.includes(id));
 
   const status = cardsQ.isError
     ? { text: "cards unavailable", stale: true }
@@ -433,10 +435,10 @@ export function CardRegion() {
         : { text: (result.live ? "live · " : "polling · ") + new Date(result.at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" }), stale: false };
 
   return (
-    <div className="cp-region" ref={rootRef} data-testid="cockpit-region">
+    <div className={"cp-region" + (focus ? " focus" : "")} ref={rootRef} data-testid="cockpit-region">
       <CockpitSync />
       <header className="cp-head">
-        <h1>Cards</h1>
+        <h1>{focus ? "Velocity & health" : "Cards"}</h1>
         <span className={"cp-live" + (status.stale ? " stale" : "")} aria-live="polite">
           <i className={"cp-dot " + (status.stale ? "t-a" : "t-g")} />
           {status.text}
@@ -462,7 +464,7 @@ export function CardRegion() {
       ) : null}
 
       {layout.bands.map((band) => {
-        const ids = band.cards.filter((id) => !hidden.has(id));
+        const ids = band.cards.filter(shown);
         if (!ids.length) return null;
         const cards = ids.map((id) => byId.get(id) ?? placeholder(id));
         const isCollapsed = !!collapsed[band.id];
