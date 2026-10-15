@@ -4,9 +4,11 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { CARD_TITLES, type CardId, type CardsResult, type CockpitCard } from "@shared/cockpit";
 import type { HomeView, Opens } from "@shared/cockpit-home";
+import { HEADER_WINDOWS, isNativeWindow, type WindowId } from "@shared/cockpit-windows";
 import { BoardDialog } from "./BoardDialog";
 import { CardDialog } from "./CardDialog";
 import { useCanWrite } from "./viewer";
+import { WindowDialog } from "./WindowDialog";
 import { CardRegion } from "./CardRegion";
 import { Home } from "./Home";
 import { LegacyWindow, type LegacyTarget } from "./LegacyWindow";
@@ -45,6 +47,7 @@ export function Cockpit() {
   }, []);
   const [cardOpen, setCardOpen] = useState<CardId | null>(null);
   const [legacy, setLegacy] = useState<LegacyTarget | null>(null);
+  const [win, setWin] = useState<WindowId | null>(null);
   const opener = useRef<HTMLElement | null>(null);
   const [glance, setGlance] = useState(false);
   useEffect(() => {
@@ -76,11 +79,15 @@ export function Cockpit() {
   const open = useCallback((o: Opens, el: HTMLElement) => {
     opener.current = el;
     if ("card" in o) setCardOpen(o.card);
+    else if (isNativeWindow(o.legacy)) setWin(o.legacy);
     else setLegacy({ slug: o.legacy, label: LEGACY_LABEL[o.legacy] || o.legacy });
   }, []);
   const openHeader = useCallback((o: HeaderOpen) => {
     if ("href" in o) window.open(o.href, "_blank", "noopener");
-    else setLegacy({ button: o.button, label: o.label });
+    else if (isNativeWindow(HEADER_WINDOWS[o.button])) {
+      opener.current = document.activeElement as HTMLElement | null;
+      setWin(HEADER_WINDOWS[o.button]);
+    } else setLegacy({ button: o.button, label: o.label });
   }, []);
   const refresh = useCallback(() => void qc.invalidateQueries(), [qc]);
 
@@ -120,6 +127,14 @@ export function Cockpit() {
       </div>
       <CardDialog card={cardOpen && cardOpen !== "board" ? face(cardOpen) : null} onClose={() => setCardOpen(null)} returnTo={opener.current} />
       <BoardDialog card={cardOpen === "board" ? face("board") : null} onClose={() => setCardOpen(null)} returnTo={opener.current} />
+      <WindowDialog
+        id={win}
+        onClose={() => {
+          setWin(null);
+          refresh();
+        }}
+        returnTo={opener.current}
+      />
       <LegacyWindow
         target={legacy}
         onClose={() => {

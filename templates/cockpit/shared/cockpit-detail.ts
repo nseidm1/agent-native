@@ -26,6 +26,19 @@ export const COCKPIT_ACTIONS = {
   // FA-19087: the home column's controls
   "lane-switch": "locks.set",
   budget: "budget.set",
+  // FA-19087: the windows' writes (MI-371)
+  push: "release.push",
+  "master-send": "master.send",
+  "android-install": "android.install",
+  "account-start": "account.start",
+  "account-code": "account.code",
+  "account-step": "account.step",
+  strict: "strict.set",
+  question: "questions",
+  issue: "issues.act",
+  "app-new": "apps.new",
+  "app-request": "apps.request",
+  "app-staging": "apps.staging",
 } as const;
 /** Every manifest action name a dialog can run. */
 export const COCKPIT_ACTION_NAMES_USED = [
@@ -41,6 +54,23 @@ export const COCKPIT_ACTION_NAMES_USED = [
   "halo.setModel",
   "locks.set",
   "budget.set",
+  "release.push",
+  "master.send",
+  "android.install",
+  "account.start",
+  "account.code",
+  "account.step",
+  "strict.set",
+  "questions.answer",
+  "questions.overrule",
+  "questions.snooze",
+  "questions.unsnooze",
+  "questions.undo",
+  "questions.drop",
+  "issues.act",
+  "apps.new",
+  "apps.request",
+  "apps.staging",
 ] as const;
 
 /**
@@ -57,6 +87,18 @@ export const WRITE_ACTIONS = {
   "halo-model": "cockpit-halo-model",
   "lane-switch": "cockpit-lane-switch",
   budget: "cockpit-budget",
+  push: "cockpit-release-push",
+  "master-send": "cockpit-master-send",
+  "android-install": "cockpit-android-install",
+  "account-start": "cockpit-account-start",
+  "account-code": "cockpit-account-code",
+  "account-step": "cockpit-account-step",
+  strict: "cockpit-strict",
+  question: "cockpit-question",
+  issue: "cockpit-issue",
+  "app-new": "cockpit-app-new",
+  "app-request": "cockpit-app-request",
+  "app-staging": "cockpit-app-staging",
 } as const;
 export type WriteKind = keyof typeof WRITE_ACTIONS;
 export const WRITE_ACTION_NAMES = Object.values(WRITE_ACTIONS);
@@ -93,6 +135,15 @@ export interface DetailStat {
   tone?: Tone;
 }
 
+export interface DetailBar {
+  label: string;
+  value: string;
+  frac: number;
+  tone?: Tone;
+  sub?: string;
+  title?: string;
+}
+
 export interface DetailItem {
   text: string;
   strong?: string;
@@ -104,7 +155,7 @@ export interface DetailItem {
 export interface DetailSection {
   title: string;
   sub?: string;
-  kind: "stats" | "table" | "list" | "text";
+  kind: "stats" | "table" | "list" | "text" | "bars";
   stats?: DetailStat[];
   columns?: string[];
   /** Which columns are numbers (right-aligned). */
@@ -112,6 +163,8 @@ export interface DetailSection {
   rows?: DetailRow[];
   items?: DetailItem[];
   text?: string;
+  /** kind "bars" (FA-19087 windows): one horizontal bar per row, frac 0..1 of the track. */
+  bars?: DetailBar[];
   /** Rows or items left out by the cap. */
   more?: number;
   /** Shown collapsed (details/summary). */

@@ -123,15 +123,35 @@
   },
   {
    "name": "account",
-   "description": "The Claude account the lane runs on: its label and tone, the Halo login match, the plan usage windows."
+   "description": "The Claude account the lane runs on: its label and tone, the Halo login match, the plan usage windows, and a sign-in or swap in flight (its steps and links; account.start, account.code and account.step drive it)."
   },
   {
    "name": "master",
-   "description": "Messages with master: the console's messages and master's replies (newest last), for the header's unread count."
+   "description": "Messages with master: the newest 30 of the thread (the console's messages and master's replies, whole), and the reply times for the header's unread count (master.send sends one)."
   },
   {
    "name": "android",
-   "description": "The phone app: whether a phone is attached, its install state and what the header pill says."
+   "description": "The phone app: whether a phone is attached, its install state and its steps, and what the header pill says (android.install installs)."
+  },
+  {
+   "name": "queueview",
+   "description": "The commit queue: what is queued to land and what landed, as the queue window's text and its counts."
+  },
+  {
+   "name": "jevbuild",
+   "description": "JEV build: the decision points being built, each with its units and counts."
+  },
+  {
+   "name": "questions",
+   "description": "The console questions: the open ones (each with its options, why, area and priority), the newest 30 answered, and the counts (questions.* answer them)."
+  },
+  {
+   "name": "issues",
+   "description": "Issues: each stuck card, what was tried at each tier, the refusal and what is wanted next (issues.act retries, changes the tier or closes one)."
+  },
+  {
+   "name": "appdialog",
+   "description": "The Apps picker: each app's staging (exists, built, running) and picture state (apps.staging starts staging)."
   }
  ],
  "actions": [
@@ -405,6 +425,404 @@
      },
      "auto": {
       "type": "boolean"
+     }
+    }
+   }
+  },
+  {
+   "name": "master.send",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "text"
+    ],
+    "properties": {
+     "text": {
+      "type": "string",
+      "maxLength": 4000
+     }
+    }
+   }
+  },
+  {
+   "name": "release.push",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "confirm"
+    ],
+    "properties": {
+     "confirm": {
+      "type": "boolean"
+     }
+    }
+   }
+  },
+  {
+   "name": "android.install",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [],
+    "properties": {
+     "serial": {
+      "type": "string",
+      "maxLength": 80
+     }
+    }
+   }
+  },
+  {
+   "name": "account.start",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "kind"
+    ],
+    "properties": {
+     "kind": {
+      "type": "string",
+      "enum": [
+       "signin",
+       "swap",
+       "halo"
+      ]
+     },
+     "email": {
+      "type": "string",
+      "maxLength": 200
+     }
+    }
+   }
+  },
+  {
+   "name": "account.code",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "code"
+    ],
+    "properties": {
+     "code": {
+      "type": "string",
+      "maxLength": 400
+     }
+    }
+   }
+  },
+  {
+   "name": "account.step",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "act"
+    ],
+    "properties": {
+     "act": {
+      "type": "string",
+      "enum": [
+       "retry",
+       "checkpoint",
+       "skip",
+       "cancel",
+       "dismiss",
+       "resume"
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "strict.set",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "gate",
+     "on"
+    ],
+    "properties": {
+     "gate": {
+      "type": "string",
+      "enum": [
+       "drafterFloor",
+       "auditors",
+       "review",
+       "suite",
+       "kick",
+       "shipping",
+       "releaseGate",
+       "batch",
+       "brief",
+       "sendBack"
+      ]
+     },
+     "on": {
+      "type": "boolean"
+     },
+     "confirm": {
+      "type": "boolean"
+     }
+    }
+   }
+  },
+  {
+   "name": "questions.answer",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "id"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "maxLength": 80
+     },
+     "option": {
+      "type": "string",
+      "maxLength": 400
+     },
+     "text": {
+      "type": "string",
+      "maxLength": 4000
+     }
+    }
+   }
+  },
+  {
+   "name": "questions.overrule",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "id"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "maxLength": 80
+     },
+     "option": {
+      "type": "string",
+      "maxLength": 400
+     },
+     "text": {
+      "type": "string",
+      "maxLength": 4000
+     }
+    }
+   }
+  },
+  {
+   "name": "questions.snooze",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "id"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "maxLength": 80
+     },
+     "minutes": {
+      "type": "number",
+      "maximum": 100000
+     }
+    }
+   }
+  },
+  {
+   "name": "questions.unsnooze",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "id"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "maxLength": 80
+     }
+    }
+   }
+  },
+  {
+   "name": "questions.undo",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "id"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "maxLength": 80
+     }
+    }
+   }
+  },
+  {
+   "name": "questions.drop",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "id",
+     "reason"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "maxLength": 80
+     },
+     "reason": {
+      "type": "string",
+      "maxLength": 500
+     }
+    }
+   }
+  },
+  {
+   "name": "issues.act",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "id",
+     "do"
+    ],
+    "properties": {
+     "id": {
+      "type": "string",
+      "maxLength": 80
+     },
+     "do": {
+      "type": "string",
+      "enum": [
+       "retry",
+       "tier",
+       "close"
+      ]
+     },
+     "tier": {
+      "type": "string",
+      "enum": [
+       "haiku",
+       "sonnet",
+       "opus",
+       "human"
+      ]
+     },
+     "reason": {
+      "type": "string",
+      "maxLength": 500
+     }
+    }
+   }
+  },
+  {
+   "name": "apps.new",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "name",
+     "description"
+    ],
+    "properties": {
+     "name": {
+      "type": "string",
+      "maxLength": 80
+     },
+     "description": {
+      "type": "string",
+      "maxLength": 20000
+     }
+    }
+   }
+  },
+  {
+   "name": "apps.request",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "app",
+     "kind",
+     "title",
+     "what"
+    ],
+    "properties": {
+     "app": {
+      "type": "string",
+      "maxLength": 80
+     },
+     "kind": {
+      "type": "string",
+      "enum": [
+       "feature",
+       "fix",
+       "polish"
+      ]
+     },
+     "title": {
+      "type": "string",
+      "maxLength": 80
+     },
+     "what": {
+      "type": "string",
+      "maxLength": 2000
+     },
+     "done": {
+      "type": "string",
+      "maxLength": 400
+     },
+     "where": {
+      "type": "string",
+      "maxLength": 200
+     }
+    }
+   }
+  },
+  {
+   "name": "apps.staging",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "app"
+    ],
+    "properties": {
+     "app": {
+      "type": "string",
+      "maxLength": 80
      }
     }
    }

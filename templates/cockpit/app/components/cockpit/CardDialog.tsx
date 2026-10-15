@@ -217,6 +217,23 @@ function Section({ s, tagFilter, canWrite, onDone }: { s: DetailSection; tagFilt
       ) : (
         <p className="cp-empty">{s.empty || "none"}</p>
       )
+    ) : s.kind === "bars" ? (
+      s.bars && s.bars.length ? (
+        <ul className="cp-bars">
+          {s.bars.map((b, i) => (
+            <li key={i} className={b.tone ? "t-" + b.tone : undefined} title={b.title}>
+              <span className="cp-bar-l">{b.label}</span>
+              <span className="cp-bar-t" aria-hidden="true">
+                <i style={{ width: Math.max(0, Math.min(1, b.frac)) * 100 + "%" }} />
+              </span>
+              <span className={"cp-bar-v" + (b.tone ? " c-" + b.tone : "")}>{b.value}</span>
+              {b.sub ? <span className="cp-bar-s">{b.sub}</span> : null}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="cp-empty">{s.empty || "none"}</p>
+      )
     ) : (
       <p className="cp-text">{s.text}</p>
     );
@@ -363,13 +380,25 @@ export function SearchField({ search, value, onChange, matches }: { search: Deta
 }
 
 function DetailBody({ id, canWrite }: { id: CardId; canWrite: boolean }) {
-  const qc = useQueryClient();
   const [server, setServer] = useState<Record<string, string>>({});
-  const [local, setLocal] = useState<Record<string, string>>({});
-  const [query, setQuery] = useState("");
   // fresh on the cockpit client's change stream (useDbSync in CardRegion); the interval is only the fallback
   const q = useActionQuery<CardDetail>("get-card-detail", { id, ...server } as any, { refetchInterval: 15000 });
   const d = q.data;
+  if (!d) {
+    return <div className="cp-dlg-msg">{q.isError ? "Could not read this card: " + (q.error instanceof Error ? q.error.message : String(q.error)) : "Reading the cockpit…"}</div>;
+  }
+  return <DetailView d={d} canWrite={canWrite} server={server} setServer={setServer} />;
+}
+
+/**
+ * A detail document (a card's, or a cockpit window's: FA-19087's WindowDialog) rendered as sections: stats, tables,
+ * lists, text and bars, with its filters, search, whole-dialog actions and job form. server/setServer carry the
+ * filters that refetch (the caller owns the query).
+ */
+export function DetailView({ d, canWrite, server, setServer }: { d: Omit<CardDetail, "id"> & { id: string }; canWrite: boolean; server: Record<string, string>; setServer: (f: (p: Record<string, string>) => Record<string, string>) => void }) {
+  const qc = useQueryClient();
+  const [local, setLocal] = useState<Record<string, string>>({});
+  const [query, setQuery] = useState("");
   const refresh = () => {
     void qc.invalidateQueries();
   };
@@ -378,9 +407,6 @@ function DetailBody({ id, canWrite }: { id: CardId; canWrite: boolean }) {
     return f ? local[f.key] ?? f.value : "all";
   }, [d, local]);
   const found = useMemo(() => (d && d.search ? searchSections(d.sections, query) : { sections: d?.sections ?? [], matches: -1 }), [d, query]);
-  if (!d) {
-    return <div className="cp-dlg-msg">{q.isError ? "Could not read this card: " + (q.error instanceof Error ? q.error.message : String(q.error)) : "Reading the cockpit…"}</div>;
-  }
   return (
     <>
       {d.error ? (

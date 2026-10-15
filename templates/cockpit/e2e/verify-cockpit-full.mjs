@@ -13,11 +13,16 @@
  *
  *   node e2e/verify-cockpit-full.mjs <shots-dir> [--base http://127.0.0.1:5207] [--legacy http://127.0.0.1:5207/legacy/] [--proxy http://127.0.0.1:5207] [--no-writes]
  * --proxy serves every non-/cards path of --base from that origin (a build under test on its own port, before the front routes to it).
+ * THE WINDOWS (FA-19087's children): every window in e2e/windows/index.mjs is opened from its own control on both pages at 1280 and 390
+ * and compared reading by reading (e2e/windows/harness.mjs). --windows-only skips the home pass; --window <id,...> runs only those windows.
  */
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 
 import { chromium } from "@playwright/test";
+
+import { runWindows } from "./windows/harness.mjs";
+import { WINDOWS } from "./windows/index.mjs";
 
 const args = process.argv.slice(2);
 const opt = (k, d) => (args.includes(k) ? args[args.indexOf(k) + 1] : d);
@@ -26,6 +31,8 @@ const base = opt("--base", "http://127.0.0.1:5207").replace(/\/$/, "");
 const legacyUrl = opt("--legacy", "http://127.0.0.1:5207/legacy/");
 const proxy = opt("--proxy", null);
 const writes = !args.includes("--no-writes");
+const windowsOnly = args.includes("--windows-only");
+const onlyWindows = opt("--window", null);
 mkdirSync(outDir, { recursive: true });
 
 const results = [];
@@ -83,6 +90,16 @@ const NEW_READ = () => {
 
 const browser = await chromium.launch({ channel: "chrome" });
 try {
+  if (!windowsOnly) await homePass();
+  const wins = onlyWindows ? WINDOWS.filter((w) => onlyWindows.split(",").includes(w.id)) : WINDOWS;
+  await runWindows({ browser, windows: wins, base, legacyUrl, outDir, check, proxyRoutes, writes });
+} catch (e) {
+  check("the run completed", false, String(e && e.message).slice(0, 300));
+} finally {
+  await browser.close();
+}
+
+async function homePass() {
   // 1. the legacy page and the agent-native page, read at the same moment, at 1280
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   await proxyRoutes(ctx);
@@ -184,10 +201,6 @@ try {
   await pp.screenshot({ path: path.join(outDir, "agent-native-390-keys.png") });
   check("no console errors or failed requests at 390", perr.length === 0, perr.slice(0, 4).join(" | "));
   await pctx.close();
-} catch (e) {
-  check("the run completed", false, String(e && e.message).slice(0, 300));
-} finally {
-  await browser.close();
 }
 const ok = results.length > 0 && results.every((r) => r.ok);
 console.log(ok ? "GREEN" : "RED");

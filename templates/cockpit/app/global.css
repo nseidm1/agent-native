@@ -1094,6 +1094,58 @@ p.cp-sec-s {
   overflow-wrap: anywhere;
 }
 
+/* bars (FA-19087 windows): a label, a glowing track, the value */
+.cp-bars {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.cp-bars li {
+  display: grid;
+  grid-template-columns: minmax(84px, 30%) 1fr auto;
+  align-items: center;
+  gap: 4px 10px;
+  font-size: 12.5px;
+  color: var(--tx2);
+}
+.cp-bar-l {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cp-bar-t {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--deep);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.cp-bar-t i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(76, 195, 255, 0.55), var(--sky));
+  box-shadow: 0 0 8px var(--glow);
+}
+.cp-bars li.t-g .cp-bar-t i { background: linear-gradient(90deg, rgba(52, 211, 153, 0.5), var(--em)); box-shadow: 0 0 8px rgba(52, 211, 153, 0.5); }
+.cp-bars li.t-a .cp-bar-t i { background: linear-gradient(90deg, rgba(251, 191, 36, 0.5), var(--amb)); box-shadow: 0 0 8px rgba(251, 191, 36, 0.45); }
+.cp-bars li.t-r .cp-bar-t i { background: linear-gradient(90deg, rgba(248, 113, 113, 0.5), var(--red)); box-shadow: 0 0 8px rgba(248, 113, 113, 0.45); }
+.cp-bar-v {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--tx);
+  text-align: right;
+  min-width: 56px;
+}
+.cp-bar-s {
+  grid-column: 1 / -1;
+  font-size: 11px;
+  color: var(--mute);
+}
+
 /* lists */
 .cp-list {
   margin: 0;
