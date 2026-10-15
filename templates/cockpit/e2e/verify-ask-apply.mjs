@@ -189,6 +189,14 @@ try {
     check("the undo went live and the region reloaded", !!end.reloaded && /^undo:/.test(end.banner), JSON.stringify(end).slice(0, 400));
     await page.waitForTimeout(3000);
     await page.screenshot({ path: path.join(out, "undone-1280.png"), fullPage: true });
+    // the office card as it was before the restyle, on the cockpit page
+    const c = await page.context().newPage();
+    await c.goto(base + "/cards/cockpit", { waitUntil: "domcontentloaded" });
+    await c.waitForSelector('[data-testid="cockpit-full"]', { timeout: 30_000 });
+    await c.waitForTimeout(4000);
+    await c.screenshot({ path: path.join(out, "undone-cockpit-1280.png"), fullPage: true });
+    if (await c.locator('[data-testid="cf-office"]').count()) await c.locator('[data-testid="cf-office"]').first().screenshot({ path: path.join(out, "undone-office-1280.png") });
+    await c.close();
     const now = await shape(page);
     check("the region is back to its pre-apply shape", JSON.stringify(now) === JSON.stringify(st.shapeBefore), JSON.stringify(now).slice(0, 300));
     // the files the applied commit changed are back to what they were before it (other commits may have landed since)
