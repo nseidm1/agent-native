@@ -5,7 +5,10 @@ import { ASK_AGENT_MAX_BODY_BYTES, MAX_ASK_IMAGES } from "../shared/ask-images.j
 import { AgentError, askAgent } from "../server/cockpit/agent.js";
 
 /**
- * The "Ask agent" panel: runs the Mac's logged-in Claude Code CLI against this
+ * The "Ask agent" panel. Each ask is first classified by a tool-less CLI call
+ * (server/cockpit/classify.ts): a "change" is filed as a board card with its
+ * images (server/cockpit/request-card.ts) and never executed; layout and read
+ * run the Mac's logged-in Claude Code CLI against this
  * app's own MCP tools (get-cards, get-card-detail, get-layout, set-layout) and nothing else;
  * UI only: never an agent or MCP tool, so a run cannot start another run.
  * server/middleware/ask-agent-loopback.ts refuses any non-loopback request.
@@ -15,7 +18,7 @@ import { AgentError, askAgent } from "../server/cockpit/agent.js";
  */
 export default defineAction({
   description:
-    "Ask the cockpit's agent (the Mac's Claude Code CLI) a question about the card region; it may rearrange cards through set-layout.",
+    "Ask the cockpit's agent (the Mac's Claude Code CLI) about the card region: a tool-less classifier picks the path; a layout or read ask runs the agent (it may rearrange cards through set-layout); a change request is filed as a board card with its images and never executed.",
   schema: z.object({
     question: z.string().min(1).max(2000).describe("The question, at most 2000 characters"),
     images: z

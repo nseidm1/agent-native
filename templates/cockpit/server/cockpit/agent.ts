@@ -23,13 +23,16 @@ import path from "node:path";
 import {
   ASK_IMAGE_EXT,
   type AskImage,
+  type AskImageType,
   MAX_ASK_IMAGE_B64,
   MAX_ASK_IMAGE_BYTES,
   MAX_ASK_IMAGES,
   sniffImageType,
 } from "../../shared/ask-images.js";
 import { WRITE_ACTION_NAMES } from "../../shared/cockpit-detail.js";
+import { type AskKind, type Classification, classify } from "./classify.js";
 import { readLayout } from "./layout.js";
+import { type FiledRequest, fileRequestCard } from "./request-card.js";
 
 export const AGENT_TIMEOUT_MS = 120_000;
 export const MCP_SERVER_NAME = "cockpit";
@@ -56,8 +59,8 @@ export const AGENT_SYSTEM_PROMPT =
   "You manage the cockpit card region. Read a card's full detail with get-card-detail. Change layout only through set-layout. " +
   "Read get-layout before changing it, send the whole layout back with only the requested change, and answer in one or two short sentences.";
 
-const dataDir = () => path.resolve(process.env.COCKPIT_DATA_DIR || path.join(process.cwd(), "data", "cockpit-agent"));
-const claudeBin = () => process.env.COCKPIT_CLAUDE_BIN || path.join(os.homedir(), ".local", "bin", "claude");
+export const dataDir = () => path.resolve(process.env.COCKPIT_DATA_DIR || path.join(process.cwd(), "data", "cockpit-agent"));
+export const claudeBin = () => process.env.COCKPIT_CLAUDE_BIN || path.join(os.homedir(), ".local", "bin", "claude");
 const mcpUrl = () =>
   process.env.COCKPIT_MCP_URL || `http://127.0.0.1:${process.env.PORT || process.env.NITRO_PORT || 5241}/_agent-native/mcp`;
 const agentModel = () => process.env.COCKPIT_AGENT_MODEL || "claude-sonnet-5-5";
@@ -116,7 +119,7 @@ export function buildArgs(question: string, mcpConfigPath: string, imagePaths: s
 const B64 = /^[A-Za-z0-9+/]*={0,2}$/;
 
 /** Decode and check one attachment; the bytes and the type they really are. Throws a 400 AgentError. */
-export function decodeImage(img: AskImage, i: number): { bytes: Buffer; ext: string } {
+export function decodeImage(img: AskImage, i: number): { bytes: Buffer; ext: string; type: AskImageType } {
   const label = `Image ${i + 1}${img && typeof img.name === "string" && img.name ? ` (${img.name.slice(0, 60)})` : ""}`;
   const data = img && typeof img.data === "string" ? img.data.replace(/\s+/g, "") : "";
   if (!data) throw new AgentError(`${label} is empty.`, 400);
@@ -126,7 +129,7 @@ export function decodeImage(img: AskImage, i: number): { bytes: Buffer; ext: str
   if (bytes.length > MAX_ASK_IMAGE_BYTES) throw new AgentError(`${label} is larger than 5 MB.`, 400);
   const type = sniffImageType(bytes);
   if (!type) throw new AgentError(`${label} is not a PNG, JPEG, WebP or GIF image.`, 400);
-  return { bytes, ext: ASK_IMAGE_EXT[type] };
+  return { bytes, ext: ASK_IMAGE_EXT[type], type };
 }
 
 export class AgentError extends Error {
@@ -142,7 +145,7 @@ export class AgentError extends Error {
 
 let busy = false;
 
-interface RunResult {
+export interface RunResult {
   code: number | null;
   stdout: string;
   stderr: string;
@@ -150,7 +153,7 @@ interface RunResult {
   spawnError?: string;
 }
 
-function runCli(args: string[], cwd: string): Promise<RunResult> {
+export function runCli(args: string[], cwd: string, timeoutMs = AGENT_TIMEOUT_MS): Promise<RunResult> {
   return new Promise((resolve) => {
     const env = { ...process.env };
     // the Mac login, never an API key or a parent Claude session's identity
@@ -173,7 +176,7 @@ function runCli(args: string[], cwd: string): Promise<RunResult> {
       timedOut = true;
       child.kill("SIGTERM");
       setTimeout(() => child.kill("SIGKILL"), 3000).unref();
-    }, AGENT_TIMEOUT_MS);
+    }, timeoutMs);
     child.stdout.on("data", (d) => {
       if (stdout.length < 1_000_000) stdout += d;
     });
@@ -187,7 +190,7 @@ function runCli(args: string[], cwd: string): Promise<RunResult> {
   });
 }
 
-const firstLine = (s: string) =>
+export const firstLine = (s: string) =>
   s
     .split("\n")
     .map((x) => x.trim())
@@ -212,11 +215,29 @@ export function buildMcpConfig(ownerEmail: string) {
   };
 }
 
+export interface AskResult {
+  answer: string;
+  layoutChanged: boolean;
+  /** Which path ran: layout and read are the agent run; change filed a board card and changed nothing. */
+  kind: AskKind;
+  /** The classifier's own note when it failed and the read path was used as the safe default. */
+  classifyNote?: string;
+  card?: FiledRequest;
+}
+
+/** Injectable for tests: the classifier and the filer. */
+export interface AskDeps {
+  classify?: (q: string) => Promise<Classification>;
+  fileRequest?: typeof fileRequestCard;
+  runAgent?: typeof runCli;
+}
+
 export async function askAgent(
   question: string,
   ownerEmail: string | undefined,
   images: AskImage[] = [],
-): Promise<{ answer: string; layoutChanged: boolean }> {
+  deps: AskDeps = {},
+): Promise<AskResult> {
   const q = question.trim();
   if (!q) throw new AgentError("Ask a question first.", 400);
   if (q.length > 2000) throw new AgentError("Questions are limited to 2000 characters.", 400);
@@ -233,8 +254,20 @@ export async function askAgent(
   let exit: number | null = null;
   let layoutChanged = false;
   let error: string | undefined;
+  let kind: AskKind | undefined;
+  let filed: FiledRequest | undefined;
   try {
     await mkdir(dir, { recursive: true });
+    // 1. which path: a short tool-less CLI call; an unreadable answer falls back to read (the run that cannot change code)
+    const cls = await (deps.classify ?? classify)(q);
+    kind = cls.kind;
+    if (cls.kind === "change") {
+      // 2a. a change is never executed here: it becomes a board card carrying the request and its images
+      filed = await (deps.fileRequest ?? fileRequestCard)(q, cls, decoded);
+      const imgs = filed.attached === "board" ? ` ${filed.images.length} image${filed.images.length === 1 ? "" : "s"} attached to the card.` : filed.attached === "folder" ? ` Images saved and named on the card: ${filed.images.join(", ")}.` : "";
+      return { answer: `Filed ${filed.fa}: ${filed.title}.${imgs}`, layoutChanged: false, kind, card: filed };
+    }
+    // 2b. layout and read: today's agent run, four region tools and nothing else
     const cfg = path.join(dir, "mcp-config.json");
     await writeFile(cfg, JSON.stringify(buildMcpConfig(ownerEmail), null, 2));
     // an empty working directory outside any repo: no project settings, hooks or CLAUDE.md ride along
@@ -250,7 +283,7 @@ export async function askAgent(
       }
     }
     const before = JSON.stringify(await readLayout());
-    const r = await runCli(buildArgs(q, cfg, imagePaths), cwd);
+    const r = await (deps.runAgent ?? runCli)(buildArgs(q, cfg, imagePaths), cwd);
     exit = r.code;
     layoutChanged = JSON.stringify(await readLayout()) !== before;
     if (r.spawnError) throw new AgentError(r.spawnError);
@@ -265,7 +298,7 @@ export async function askAgent(
     if (r.code !== 0 || !parsed || parsed.is_error) {
       throw new AgentError(firstLine(result) || firstLine(r.stderr) || firstLine(r.stdout) || `Claude CLI exited ${r.code}`);
     }
-    return { answer: result || "(no answer)", layoutChanged };
+    return { answer: result || "(no answer)", layoutChanged, kind: cls.kind, ...(cls.ok ? {} : { classifyNote: cls.detail || "classifier unavailable" }) };
   } catch (e) {
     error = e instanceof Error ? e.message : String(e);
     throw e instanceof AgentError ? e : new AgentError(error);
@@ -276,7 +309,9 @@ export async function askAgent(
     const line = JSON.stringify({
       time: new Date().toISOString(),
       question: q,
-      images: imagePaths.length,
+      images: decoded.length,
+      kind,
+      ...(filed ? { card: filed.fa, attached: filed.attached } : {}),
       exit,
       layoutChanged,
       ms: Date.now() - started,

@@ -1,3 +1,4 @@
+import { agentNativePath } from "@agent-native/core/client/api-path";
 import { useActionMutation, useActionQuery } from "@agent-native/core/client/hooks";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -126,6 +127,16 @@ function readImageFile(f: File): Promise<Attached> {
   });
 }
 
+type AskKind = "layout" | "read" | "change";
+interface AskReply {
+  answer: string;
+  layoutChanged: boolean;
+  kind: AskKind;
+  classifyNote?: string;
+  card?: { fa: string; title: string; attached: string; images: string[] };
+}
+const PATH_LABEL: Record<AskKind, string> = { layout: "Layout path", read: "Read path", change: "Change request" };
+
 const kb = (n: number) => (n < 1024 * 1024 ? Math.max(1, Math.round(n / 1024)) + " KB" : (n / 1024 / 1024).toFixed(1) + " MB");
 
 function AskPanel({ onClose }: { onClose: () => void }) {
@@ -134,20 +145,26 @@ function AskPanel({ onClose }: { onClose: () => void }) {
   const [images, setImages] = useState<Attached[]>([]);
   const [attachErr, setAttachErr] = useState("");
   const [dragging, setDragging] = useState(false);
-  const [answer, setAnswer] = useState<{ text: string; changed: boolean; images: number } | null>(null);
+  const [answer, setAnswer] = useState<{ text: string; changed: boolean; images: number; kind: AskKind; fa?: string; note?: string } | null>(null);
   const ref = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const imagesRef = useRef<Attached[]>([]);
   imagesRef.current = images;
-  const ask = useActionMutation<{ answer: string; layoutChanged: boolean }, { question: string; images?: AskImage[] }>("ask-agent", {
-    timeoutMs: 135_000,
+  const ask = useActionMutation<AskReply, { question: string; images?: AskImage[] }>("ask-agent", {
+    // classifier (30 s) + the agent run (120 s) or the card filer (120 s)
+    timeoutMs: 280_000,
     onSuccess: (r, vars) => {
-      setAnswer({ text: r.answer, changed: r.layoutChanged, images: vars.images?.length ?? 0 });
+      setAnswer({ text: r.answer, changed: r.layoutChanged, images: vars.images?.length ?? 0, kind: r.kind, fa: r.card?.fa, note: r.classifyNote });
       setImages([]);
       void qc.invalidateQueries();
     },
   });
   useEffect(() => ref.current?.focus(), []);
+  // ask-agent is UI-only: take the browser's UI capability when the panel opens, so the first ask does not go out
+  // without it and come back 403 ui_capability_required before the framework's own retry (a console error in the cockpit)
+  useEffect(() => {
+    void fetch(agentNativePath("/_agent-native/ui-capability"), { credentials: "same-origin", cache: "no-store" }).catch(() => {});
+  }, []);
 
   const addFiles = async (files: File[]) => {
     setAttachErr("");
@@ -204,7 +221,7 @@ function AskPanel({ onClose }: { onClose: () => void }) {
         void addFiles(Array.from(e.dataTransfer.files));
       }}
     >
-      <label htmlFor="cp-ask-q">Ask the agent to read or rearrange these cards</label>
+      <label htmlFor="cp-ask-q">Ask the agent to read or rearrange these cards, or request a change</label>
       <div className="cp-ask-row">
         <textarea
           id="cp-ask-q"
@@ -284,7 +301,9 @@ function AskPanel({ onClose }: { onClose: () => void }) {
         </ul>
       ) : null}
       <div className="cp-ask-hint">
-        {dragging ? "Drop to attach" : `Images: attach, paste or drop · up to ${MAX_ASK_IMAGES}, 5 MB each, PNG/JPEG/WebP/GIF`}
+        {dragging
+          ? "Drop to attach"
+          : `A change request is filed as a board card (with any images) and built through the normal path; nothing runs from here. Images: attach, paste or drop · up to ${MAX_ASK_IMAGES}, 5 MB each, PNG/JPEG/WebP/GIF`}
       </div>
       {attachErr ? (
         <div className="cp-ask-out err" role="alert">
@@ -293,7 +312,7 @@ function AskPanel({ onClose }: { onClose: () => void }) {
       ) : null}
       {ask.isPending ? (
         <div className="cp-ask-out busy" aria-live="polite">
-          The agent is working (up to 2 minutes)…
+          Classifying, then answering or filing a card (up to 2 minutes)…
         </div>
       ) : ask.isError ? (
         <div className="cp-ask-out err" role="alert">
@@ -301,12 +320,18 @@ function AskPanel({ onClose }: { onClose: () => void }) {
         </div>
       ) : answer ? (
         <>
-          <div className="cp-ask-out" aria-live="polite">
+          <div className={"cp-ask-out" + (answer.kind === "change" ? " filed" : "")} aria-live="polite" data-testid="ask-answer" data-kind={answer.kind}>
             {answer.text}
           </div>
-          <div className="cp-ask-meta">
-            {answer.changed ? "Layout changed." : "Layout unchanged."}
-            {answer.images ? ` ${answer.images} image${answer.images === 1 ? "" : "s"} sent.` : ""}
+          <div className="cp-ask-meta" data-testid="ask-meta">
+            <span className={"cp-ask-path k-" + answer.kind}>{PATH_LABEL[answer.kind]}</span>
+            {answer.kind === "change"
+              ? ` Filed as ${answer.fa}; nothing in the cockpit was changed.`
+              : answer.changed
+                ? " Layout changed."
+                : " Layout unchanged."}
+            {answer.images && answer.kind !== "change" ? ` ${answer.images} image${answer.images === 1 ? "" : "s"} sent.` : ""}
+            {answer.note ? ` (Classifier unavailable, answered as a read: ${answer.note})` : ""}
           </div>
         </>
       ) : null}
