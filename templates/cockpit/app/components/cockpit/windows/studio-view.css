@@ -291,6 +291,11 @@ p.st-sub {
 .st-main {
   grid-template-columns: minmax(0, 1fr) minmax(240px, 300px);
 }
+@media (max-width: 759px) {
+  .st-main {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
 /* the action row: the Agent chat, the menus, Open live */
 .st-acts {
   display: flex;

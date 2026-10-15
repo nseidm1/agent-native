@@ -68,7 +68,7 @@ export const narrowNow = () => typeof window !== "undefined" && window.matchMedi
 
 // ---------- the studio's layers ----------
 /** An element picked in the live frame (Select), sent with the next chat message as a reference. */
-export type FrameRef = { sel: string; label?: string; src?: string; tag?: string; text?: string; note?: string; shot?: string };
+export type FrameRef = { sel: string; label?: string; src?: string; tag?: string; text?: string; note?: string; shot?: string; page?: string; comment?: string };
 /**
  * The dialogs and drawers a studio can open over itself; every tool opens another's through ctx.open (the Improve menu's
  * Decide in, the inbox's proposals, the Design menu's Add a theme -> the chat ...). One is open at a time.
@@ -93,6 +93,10 @@ export interface StageHandle {
   variants(): void;
   /** the frame's own app theme state: kind false = one theme (base), else switchable */
   theme: { kind: boolean; base: string } | null;
+  /** What changed's Show me: bring these selectors into view in the frame */
+  show?(sels: string[]): Promise<unknown>;
+  /** Phone (false) or Wide (true) */
+  setWidth?(wide: boolean): void;
 }
 
 export interface Studio {
