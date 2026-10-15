@@ -117,3 +117,9 @@ export function useStudio(): Studio {
   if (!s) throw new Error("useStudio outside the studio");
   return s;
 }
+
+/** One item of an action menu (studio-lifecycle.js menu(): {k, label, why, disabled, run, badge, tone, busy}, or a separator / heading). */
+export type MenuItem =
+  | { k: string; label: string; why?: string | null; disabled?: boolean; busy?: boolean; badge?: string | number | null; tone?: string; run: () => void }
+  | { sep: true }
+  | { head: string };

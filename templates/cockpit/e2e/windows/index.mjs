@@ -12,7 +12,13 @@ import queue from "./queue.mjs";
 
 import apps from "./apps.mjs";
 import studio from "./studio.mjs";
+// FA-19087 (FA-19172..FA-19175): the studio's tools, each against the legacy studio's own
+import studioChat from "./studio-chat.mjs";
+import studioMenus from "./studio-menus.mjs";
+import studioDesign from "./studio-design.mjs";
+import studioFrame from "./studio-frame.mjs";
+import studioDrawers from "./studio-drawers.mjs";
 import issues from "./issues.mjs";
 import questions from "./questions.mjs";
 
-export const WINDOWS = [push, overview, agents, queue, account, master, phone, jev, halosave, balancer, apps, studio, questions, issues];
+export const WINDOWS = [push, overview, agents, queue, account, master, phone, jev, halosave, balancer, apps, studio, studioChat, studioMenus, studioDesign, studioFrame, studioDrawers, questions, issues];

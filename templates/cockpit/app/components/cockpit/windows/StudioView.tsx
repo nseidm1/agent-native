@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { READ_ONLY } from "../CardDialog";
 import { type StageHandle, type Studio, StudioCtx, type StudioLayer } from "./studio/api";
 import { AgentButton, ChatLayer } from "./studio/StudioChat";
+import { DesignLayers } from "./studio/DesignTools";
 import { DetailsButton, DrawerLayers, InboxButton, TileDetail } from "./studio/StudioDrawers";
 import { MenuLayers, StudioMenus } from "./studio/StudioMenus";
 import { StudioStage } from "./studio/StudioStage";
@@ -247,6 +248,7 @@ export function StudioView({ s, canWrite, onDone, onBack }: { s: StudioData; can
         ) : null}
         <ChatLayer />
         <MenuLayers />
+        <DesignLayers />
         <DrawerLayers />
       </div>
     </StudioCtx.Provider>
