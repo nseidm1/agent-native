@@ -39,6 +39,8 @@ export const COCKPIT_ACTIONS = {
   "app-new": "apps.new",
   "app-request": "apps.request",
   "app-staging": "apps.staging",
+  // FA-19087 (FA-19172..FA-19175): the studio's own writes (MI-379)
+  "studio-post": "studio.post",
 } as const;
 /** Every manifest action name a dialog can run. */
 export const COCKPIT_ACTION_NAMES_USED = [
@@ -71,6 +73,7 @@ export const COCKPIT_ACTION_NAMES_USED = [
   "apps.new",
   "apps.request",
   "apps.staging",
+  "studio.post",
 ] as const;
 
 /**
@@ -99,6 +102,7 @@ export const WRITE_ACTIONS = {
   "app-new": "cockpit-app-new",
   "app-request": "cockpit-app-request",
   "app-staging": "cockpit-app-staging",
+  "studio-post": "cockpit-studio-post",
 } as const;
 export type WriteKind = keyof typeof WRITE_ACTIONS;
 export const WRITE_ACTION_NAMES = Object.values(WRITE_ACTIONS);

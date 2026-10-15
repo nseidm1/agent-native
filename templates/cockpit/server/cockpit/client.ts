@@ -443,3 +443,55 @@ export const thumbShaOf = (url: unknown): string | null => {
   const m = /\/([0-9a-f]{12})\.jpg$/.exec(String(url || ""));
   return m ? m[1] : null;
 };
+
+// ---------- the studio's own routes (FA-19087: FA-19172..FA-19175, the cockpit's MI-379) ----------
+/** The roots of the legacy studio's routes the client carries: app (the app's studio), qa (its QA agents), env (its environments), studio (app-free). */
+export const STUDIO_ROOTS = ["app", "qa", "env", "studio"] as const;
+export type StudioRoot = (typeof STUDIO_ROOTS)[number];
+/** A studio path: plain lowercase segments (the cockpit's allow-list decides which are carried). */
+export const STUDIO_PATH = /^(?:[A-Za-z0-9_.-]+(?:\/[A-Za-z0-9_.-]+)*)?$/;
+const studioPathOk = (p: string) => STUDIO_PATH.test(p) && !p.split("/").some((s) => s === ".." || s === ".") && p.length <= 200;
+const studioUrl = (kind: "studio" | "studio-files", app: string, root: string, path: string) => prefix() + "/" + kind + "/" + app + "/" + root + (path ? "/" + path : "");
+/**
+ * One of the legacy studio's reads (the chat and its live reply, the frame info, a lens, the KPIs, the launch
+ * scorecard, the designs, QA, the deploy ...), by its root and path; only what the cockpit's allow-list carries
+ * answers. The studio's own refusal comes back as a ClientError with its status and words.
+ */
+export async function studioGet<T = any>(app: string, root: StudioRoot, path: string, query: Record<string, string | number> = {}): Promise<T> {
+  if (!APP_ID.test(app) || !STUDIO_ROOTS.includes(root) || !studioPathOk(path)) throw new ClientError("bad studio read", 400);
+  const q = new URLSearchParams(Object.entries(query).map(([k, v]) => [k, String(v)]));
+  const r = await request("GET", studioUrl("studio", app, root, path) + (String(q) ? "?" + q : ""));
+  if (r.status !== 200) throw new ClientError(why(r), r.status || 502);
+  const j = parse(r.body);
+  if (!j || !("data" in j)) throw new ClientError("the cockpit answered no studio data", 502);
+  return j.data as T;
+}
+/** One of the legacy studio's writes (the action studio.post): the studio's own route, its body unchanged; its refusal in its own words. */
+export function studioPost<T = any>(app: string, root: Exclude<StudioRoot, "studio">, path: string, body: Record<string, unknown> = {}): Promise<T> {
+  if (!APP_ID.test(app) || !studioPathOk(path)) return Promise.reject(new ClientError("bad studio write", 400));
+  return act<T>("studio.post", { app, root, path, body });
+}
+/** A studio picture's bytes (a chat image, a studio file, a QA screenshot) with the cockpit's content type and CSP; null when it has none. */
+export function studioFile(app: string, root: StudioRoot, path: string): Promise<{ buf: Buffer; type: string; csp: string | null } | null> {
+  if (!APP_ID.test(app) || !STUDIO_ROOTS.includes(root) || !studioPathOk(path) || !path) return Promise.reject(new ClientError("bad studio file name", 400));
+  const u = new URL(origin());
+  return new Promise((resolve, reject) => {
+    const req = http.request({ host: u.hostname, port: u.port || 80, path: studioUrl("studio-files", app, root, path), method: "GET", timeout: READ_TIMEOUT_MS * 2, headers: { host: u.host, "user-agent": "cockpit-region (agent-native)" } }, (res) => {
+      const chunks: Buffer[] = [];
+      let n = 0;
+      res.on("data", (c: Buffer) => {
+        n += c.length;
+        if (n <= 16_000_000) chunks.push(c);
+      });
+      res.on("end", () => {
+        if (res.statusCode === 404) return resolve(null);
+        if (res.statusCode !== 200 || n > 16_000_000) return reject(new ClientError("the studio file answered " + res.statusCode, res.statusCode || 502));
+        const csp = res.headers["content-security-policy"];
+        resolve({ buf: Buffer.concat(chunks), type: String(res.headers["content-type"] || "application/octet-stream"), csp: csp ? String(csp) : null });
+      });
+    });
+    req.on("timeout", () => req.destroy(new Error("the cockpit did not answer within " + Math.round((READ_TIMEOUT_MS * 2) / 1000) + " s")));
+    req.on("error", (e) => reject(e instanceof ClientError ? e : new ClientError("cockpit unreachable: " + e.message, 502)));
+    req.end();
+  });
+}

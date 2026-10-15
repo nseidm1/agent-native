@@ -827,6 +827,40 @@
    }
   },
   {
+   "name": "studio.post",
+   "write": true,
+   "schema": {
+    "type": "object",
+    "additionalProperties": false,
+    "required": [
+     "app",
+     "root",
+     "path"
+    ],
+    "properties": {
+     "app": {
+      "type": "string",
+      "maxLength": 41
+     },
+     "root": {
+      "type": "string",
+      "enum": [
+       "app",
+       "qa",
+       "env"
+      ]
+     },
+     "path": {
+      "type": "string",
+      "maxLength": 200
+     },
+     "body": {
+      "type": "object"
+     }
+    }
+   }
+  },
+  {
    "name": "apps.staging",
    "write": true,
    "schema": {
