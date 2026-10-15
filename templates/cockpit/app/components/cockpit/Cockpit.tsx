@@ -90,6 +90,44 @@ export function Cockpit() {
     } else setLegacy({ button: o.button, label: o.label });
   }, []);
   const refresh = useCallback(() => void qc.invalidateQueries(), [qc]);
+  // FA-19129/FA-19134: the windows' own openers - #questions (#questions/<id>), #issues and #apps open the native windows,
+  // #apps=<id> an app's studio (still the legacy page's); a window's part opens another window or the legacy studio by event
+  useEffect(() => {
+    const fromHash = () => {
+      const h = window.location.hash;
+      const app = /^#apps=([\w-]+)$/.exec(h);
+      if (app) {
+        setWin(null);
+        setLegacy({ slug: "apps=" + app[1], label: "App studio" });
+        return;
+      }
+      const m = /^#(questions|issues|apps)(?:\/cq-[a-z0-9]+)?$/.exec(h);
+      if (m && isNativeWindow(m[1])) setWin(m[1]);
+    };
+    const onLegacy = (e: Event) => {
+      const d = (e as CustomEvent<{ slug?: string; label?: string }>).detail;
+      if (d && typeof d.slug === "string") {
+        setWin(null);
+        setLegacy({ slug: d.slug, label: String(d.label || d.slug) });
+      }
+    };
+    const onWin = (e: Event) => {
+      const d = (e as CustomEvent<{ id?: string }>).detail;
+      if (d && isNativeWindow(d.id)) setWin(d.id);
+    };
+    fromHash();
+    window.addEventListener("hashchange", fromHash);
+    window.addEventListener("cockpit-open-legacy", onLegacy);
+    window.addEventListener("cockpit-open-window", onWin);
+    return () => {
+      window.removeEventListener("hashchange", fromHash);
+      window.removeEventListener("cockpit-open-legacy", onLegacy);
+      window.removeEventListener("cockpit-open-window", onWin);
+    };
+  }, []);
+  const clearHash = () => {
+    if (/^#(questions|issues|apps)/.test(window.location.hash)) history.replaceState(null, "", window.location.pathname + window.location.search);
+  };
 
   const h = homeQ.data;
   return (
@@ -131,6 +169,7 @@ export function Cockpit() {
         id={win}
         onClose={() => {
           setWin(null);
+          clearHash();
           refresh();
         }}
         returnTo={opener.current}
@@ -139,6 +178,7 @@ export function Cockpit() {
         target={legacy}
         onClose={() => {
           setLegacy(null);
+          clearHash();
           refresh();
           opener.current?.focus();
         }}

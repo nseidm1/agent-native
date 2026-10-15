@@ -27,7 +27,11 @@ export const WINDOW_TITLES: Record<WindowId, string> = {
 };
 
 /** A window's document: a CardDetail whose id is a window id. */
-export type WindowDetail = Omit<CardDetail, "id"> & { id: WindowId };
+export type WindowDetail = Omit<CardDetail, "id"> & {
+  id: WindowId;
+  /** The data a window's own part (WINDOW_PARTS) draws, when its sections cannot carry it (the Apps tiles). */
+  part?: Record<string, unknown>;
+};
 
 /** Filter arguments a window may take (each window says which in its filters; unknown keys are ignored). */
 export type WindowArgs = Record<string, string | undefined>;
@@ -39,7 +43,7 @@ export const isWindowId = (s: unknown): s is WindowId => typeof s === "string" &
  * (LegacyWindow) until its section lands. server/cockpit/windows/registry.spec.ts keeps this equal to the
  * registry's builders, so a window is native exactly when it has one.
  */
-export const NATIVE_WINDOWS: readonly WindowId[] = ["push"];
+export const NATIVE_WINDOWS: readonly WindowId[] = ["push", "apps"];
 export const isNativeWindow = (s: unknown): s is WindowId => isWindowId(s) && NATIVE_WINDOWS.includes(s);
 
 /** The header buttons (their legacy ids, TopBar's HeaderOpen) and the window each opens. */
