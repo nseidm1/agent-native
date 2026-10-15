@@ -1,0 +1,58 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  writeAppStateForCurrentTab: vi.fn(),
+}));
+
+vi.mock("@agent-native/core/application-state", () => ({
+  writeAppStateForCurrentTab: mocks.writeAppStateForCurrentTab,
+}));
+
+import action from "./navigate";
+
+describe("navigate", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.writeAppStateForCurrentTab.mockResolvedValue(undefined);
+  });
+
+  it("requires at least a view or a path", async () => {
+    await expect(action.run({})).rejects.toThrow(
+      "At least --view or --path is required.",
+    );
+    expect(mocks.writeAppStateForCurrentTab).not.toHaveBeenCalled();
+  });
+
+  it("navigates by view and only includes provided keys", async () => {
+    const result = await action.run({ view: "cards" });
+
+    expect(result).toBe("Navigating to cards");
+    expect(mocks.writeAppStateForCurrentTab).toHaveBeenCalledWith(
+      "navigate",
+      expect.objectContaining({ view: "cards" }),
+    );
+    const callArg = mocks.writeAppStateForCurrentTab.mock.calls[0][1];
+    expect(callArg.path).toBeUndefined();
+    expect(Object.keys(callArg).sort()).toEqual(["_writeId", "view"]);
+  });
+
+  it("navigates by path when view is not given", async () => {
+    const result = await action.run({ path: "/settings" });
+
+    expect(result).toBe("Navigating to /settings");
+  });
+
+  it("prefers view over path when both are given", async () => {
+    const result = await action.run({ view: "cards", path: "/settings" });
+
+    expect(result).toBe("Navigating to cards");
+  });
+
+  it("stamps a unique _writeId on every write", async () => {
+    await action.run({ view: "cards" });
+
+    const callArg = mocks.writeAppStateForCurrentTab.mock.calls[0][1];
+    expect(typeof callArg._writeId).toBe("string");
+    expect(callArg._writeId.includes("-")).toBe(true);
+  });
+});
